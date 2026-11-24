@@ -14,7 +14,7 @@ test("make runs capture, narrate and compose, then stops before the render until
   const at = ["--project", project, "--video", SAMPLE_VIDEO];
   const r = cli(["video", "make", ...at, "--dry-run"]);
   assert.equal(r.code, 3, r.stderr);
-  assert.match(r.stdout, /^capture: nothing to capture \(screens is the folder screens\)\nnarrate: 7 lines, in narration\/\ncompose: \d+(\.\d+)? s, 8 shots -> index\.html\n$/);
+  assert.match(r.stdout, /^capture: nothing to capture \(screens is the folder screens\)\nnarrate: 7 lines, in narration\/\ncompose: \d+(\.\d+)? s, 8 shots -> index\.html\ncompose: text fit: not measured: no Chrome \(none found; run npx --yes hyperframes@0\.9\.58 browser ensure, or set JHON_STUDIO_CHROME\)\n$/);
   assert.equal(r.stderr, `jhon-studio: video make stopped before the render: the script is not approved: read ${join(video, "script.json")}, then run \`jhon-studio video script --approve --project ${project} --video tour\`\n`);
   assert.ok(existsSync(join(video, "index.html")), "composed, so the owner can preview it");
 

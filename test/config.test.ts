@@ -33,6 +33,7 @@ test("defaults: name and tagline from the README's H1 and first sentence, url fr
     languages: ["en", "es"],
     screens: "docs/screens",
     captures: null,
+    chromeNoSandbox: false,
   });
   assert.equal(DEFAULT_VOICE, "af_heart");
   // Neutral ink: every default colour is a grey (its channels within 24 of each other), so no hue of anyone's brand.

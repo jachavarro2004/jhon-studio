@@ -51,6 +51,25 @@ All notable changes to jhon-studio are recorded here. The format follows
 - `jhon-studio integration [--json]`: the version, the plugin folder and the skill, as absolute
   paths in the studio's real folder (a link on PATH is followed), for Jhon's setup and doctor.
 - `jhon-studio --version`. The version is 0.1.0.
+- `capture: chrome_no_sandbox: true` in `.jhon/studio.yaml` (false by default; the environment's
+  `JHON_STUDIO_CHROME_NO_SANDBOX=1` or `0` overrides it): every Chrome the studio starts runs
+  without Chrome's own sandbox (`--no-sandbox --disable-setuid-sandbox --no-zygote`), and the
+  render tells HyperFrames the same (`HYPERFRAMES_CHROME_SANDBOX=0`), for a sandbox that allows
+  Chrome's none (such as Jhon's). Chrome dying with "No usable sandbox!" names this setting as
+  its fix.
+- Text fits its frame: headlines, card titles and lines, list rows, figures, the close's pitch,
+  the intro's name and tagline and the kickers shrink (each down to a smallest size, a group at
+  one scale) and then wrap, balanced, instead of running off the picture on one line; the
+  fitting runs in the page once its fonts load (a HyperFrames buildReady promise).
+- `video compose` (and so `video make`) measures every shot at its final state in a headless
+  Chrome and fails with exit 1 on text that overflows its card or the picture, naming each shot
+  and element (`problem: the headline's line 1 (#problem-l1) runs 212 px past the frame's
+  bottom`); the composition is still written, to preview it. Without a Chrome it says the text
+  was not measured.
+- `video review`: each shot's final state (0.35 s before its end) as `review/<shot>.png` and a
+  contact sheet, `review.png`, in the video folder, with a table of each shot's start and end;
+  its Chrome runs in the video folder and is served that folder alone. The video skill runs it
+  and shows the sheet with the script before it asks the owner for the approval.
 
 ### Changed
 
@@ -68,6 +87,9 @@ All notable changes to jhon-studio are recorded here. The format follows
   `JHON_STUDIO_*`/`JHON_MEDIA_*`, and the sample's narration cache is seeded whole, so `video
   make`'s tests no longer need Kokoro (CI, which has none, failed two of them).
 
+- `doctor` starts Chrome for real (headless, on about:blank, for up to 20 s) instead of only
+  checking that its file exists, and honours `capture.chrome_no_sandbox` in the current
+  folder's `.jhon/studio.yaml` and `JHON_STUDIO_CHROME_NO_SANDBOX`.
 - Environment names: `JHON_STUDIO_KOKORO` and `JHON_STUDIO_CHROME`, the cache in
   `~/.cache/jhon-studio`; the core's `JHON_MEDIA_KOKORO`, `JHON_MEDIA_CHROME` and
   `~/.cache/jhon-media` still work as fallbacks.

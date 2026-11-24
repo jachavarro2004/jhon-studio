@@ -81,6 +81,17 @@ export function taglineLines(tagline: string): string[] {
   return out;
 }
 
+/**
+ * The attributes that make an element's text fit its frame (templates/presentation/timeline.js
+ * shrinks it, compose's check in src/review.ts measures it): `label` names it in the check's
+ * report; with `min`, its font shrinks from its size down to `min` px until it takes at most
+ * `rows` rows and stays inside its box and its frame (the card, else the picture's safe area),
+ * the elements of one `group` at one scale; below that it wraps (or, for a kicker or a figure,
+ * which never wrap, overflows and the check fails).
+ */
+const fitAttrs = (label: string, min?: number, rows = 1, group?: string) =>
+  ` data-fit="${esc(label)}"${min ? ` data-fit-min="${min}" data-fit-rows="${rows}"` : ""}${group ? ` data-fit-group="${esc(group)}"` : ""}`;
+
 /** A font size that fits `chars` characters of the display serif in `width` px, between `min` and `max`. */
 const fit = (chars: number, width: number, max: number, min: number) => Math.max(min, Math.min(max, Math.floor(width / (0.56 * Math.max(chars, 1)))));
 
@@ -157,35 +168,36 @@ export function compose(video: Video, script: Script, config: Config): Composed 
     const open = `<div id="${id}" class="clip shot" data-start="${r3(x.clipStart)}" data-duration="${r3(x.clipEnd - x.clipStart)}" data-track-index="${x.track}" data-track-kind="graphics"><div class="rv" id="${id}-rv"><div class="cam" id="${id}-cam">`;
     const close = `</div></div></div>`;
     const p: Record<string, unknown> = { id, kind: s.kind, seam: x.seam, start: r3(x.start), end: r3(x.end), vo: r3(x.vo), sec: x.sec };
-    const kick = (text: string) => `<div class="kick card-kick" id="${id}-kick"><span class="kick-mark mark-face${markCls}">${markInner()}</span>${esc(text)}</div>`;
+    const kick = (text: string) => `<div class="kick card-kick" id="${id}-kick"${fitAttrs("the kicker", 18)}><span class="kick-mark mark-face${markCls}">${markInner()}</span>${esc(text)}</div>`;
+    const card = `<div class="card-pos"><div class="card" id="${id}-card"><div class="card-shadow"></div><div class="card-face" data-frame="the card">`;
     let body = "";
     if (s.kind === "head") {
       const ls = s.lines as [string, string][];
-      body = `<div class="head-text"><div class="kick" id="${id}-kick">${esc(s.chapter ?? "")}</div>`
-        + (s.lead ? `<div class="mask"><div class="head-lead" id="${id}-lead">${inline(s.lead)}</div></div>` : "")
-        + ls.map(([t], k) => `<div class="hl${k ? " hl2" : ""}" id="${id}-l${k + 1}">${words(t, `${id}-l${k + 1}`)}</div>`).join("")
+      body = `<div class="head-text"><div class="kick" id="${id}-kick"${fitAttrs("the chapter", 18)}>${esc(s.chapter ?? "")}</div>`
+        + (s.lead ? `<div class="mask"><div class="head-lead" id="${id}-lead"${fitAttrs("the lead", 34)}>${inline(s.lead)}</div></div>` : "")
+        + ls.map(([t], k) => `<div class="hl${k ? " hl2" : ""}" id="${id}-l${k + 1}"${fitAttrs(`the headline's line ${k + 1}`, 72, 1, `${id}-lines`)}>${words(t, `${id}-l${k + 1}`)}</div>`).join("")
         + `</div>`;
       p.lead = !!s.lead;
       p.lines = ls.map(([, ph], k) => [`#${id}-l${k + 1} .w`, at(x, ph)]);
     } else if (s.kind === "card") {
       const size = s.size ?? 108;
       const bodyLines = s.body ?? [];
-      body = `<div class="card-pos"><div class="card" id="${id}-card"><div class="card-shadow"></div><div class="card-face">`
+      body = card
         + kick(s.kicker!)
-        + `<div class="card-title" style="font-size: ${size}px">${s.title!.map((t, k) => `<div class="tl">${words(t, `${id}-t${k}`)}</div>`).join("")}</div>`
-        + (bodyLines.length ? `<div class="card-body">${bodyLines.map(([t], k) => `<span class="ink-line" id="${id}-b${k}">${inline(t)}</span>`).join("")}</div>` : "")
+        + `<div class="card-title" id="${id}-title" style="font-size: ${size}px"${fitAttrs("the title", Math.min(64, size), s.title!.length)}>${s.title!.map((t, k) => `<div class="tl">${words(t, `${id}-t${k}`)}</div>`).join("")}</div>`
+        + (bodyLines.length ? `<div class="card-body">${bodyLines.map(([t], k) => `<span class="ink-line" id="${id}-b${k}"${fitAttrs(`the body's line ${k + 1}`, 34, 1, `${id}-body`)}>${inline(t)}</span>`).join("")}</div>` : "")
         + `</div></div></div>`;
       p.title = r3(x.vo); p.body = bodyLines.map(([, ph], k) => [`#${id}-b${k}`, at(x, ph)]);
     } else if (s.kind === "list") {
-      body = `<div class="card-pos"><div class="card" id="${id}-card"><div class="card-shadow"></div><div class="card-face">`
+      body = card
         + kick(s.kicker ?? s.chapter!) + `<div class="list">`
-        + s.rows!.map(([k, v], r) => `<div class="lrow" id="${id}-r${r}"><span class="lk">${inline(k)}</span><span class="la">→</span><span class="lv">${inline(v)}</span></div>`).join("")
+        + s.rows!.map(([k, v], r) => `<div class="lrow" id="${id}-r${r}"${fitAttrs(`row ${r + 1}`, 48, 2, `${id}-rows`)}><span class="lk">${inline(k)}</span><span class="la">→</span><span class="lv">${inline(v)}</span></div>`).join("")
         + `</div></div></div></div>`;
       p.rows = s.rows!.map(([, , ph], r) => [`#${id}-r${r}`, at(x, ph)]);
     } else if (s.kind === "numbers") {
-      body = `<div class="card-pos"><div class="card" id="${id}-card"><div class="card-shadow"></div><div class="card-face">`
-        + kick(s.kicker!) + `<div class="figs">`
-        + s.figures!.map(([n, label], k) => `<div class="fig" id="${id}-f${k}"><div class="fig-n">${esc(n)}</div><div class="fig-l">${esc(label)}</div></div>`).join("")
+      body = card
+        + kick(s.kicker!) + `<div class="figs" id="${id}-figs"${fitAttrs("the figures", 96, 99)}>`
+        + s.figures!.map(([n, label], k) => `<div class="fig" id="${id}-f${k}"><div class="fig-n" id="${id}-f${k}-n"${fitAttrs(`figure ${k + 1}`)}>${esc(n)}</div><div class="fig-l" id="${id}-f${k}-l"${fitAttrs(`figure ${k + 1}'s label`)}>${esc(label)}</div></div>`).join("")
         + `</div></div></div></div>`;
       p.rows = s.figures!.map(([, , ph], k) => [`#${id}-f${k}`, at(x, ph)]);
     } else if (s.kind === "proof") {
@@ -212,8 +224,8 @@ export function compose(video: Video, script: Script, config: Config): Composed 
     } else if (s.kind === "close") {
       const size = fit(Math.max(0, ...pitch.map((l) => plain(l).length)) * 0.9, 1560, 112, 56);
       body = `<div class="close-text"><div class="close-seal"><div class="seal-shadow" id="${id}-seal-shadow"></div><div class="seal-face mark-face${markCls}" id="${id}-seal-face">${markInner()}</div></div>`
-        + pitch.map((l, k) => `<div class="mask" data-layout-allow-overflow><span class="pitch${k ? " pitch2" : ""}" id="${id}-l${k + 1}" style="font-size: ${size}px">${inline(l)}</span></div>`).join("")
-        + `<div class="close-url kick" id="${id}-url">${s.install ? `<div class="close-install">${esc(s.install)}</div>` : ""}${esc(config.url.replace(/^https?:\/\//, ""))}</div></div>`;
+        + pitch.map((l, k) => `<div class="mask" data-layout-allow-overflow><span class="pitch${k ? " pitch2" : ""}" id="${id}-l${k + 1}" style="font-size: ${size}px"${fitAttrs(`the pitch's line ${k + 1}`, 56, 1, `${id}-pitch`)}>${inline(l)}</span></div>`).join("")
+        + `<div class="close-url kick" id="${id}-url"${fitAttrs("the url", 18, s.install ? 2 : 1)}>${s.install ? `<div class="close-install">${esc(s.install)}</div>` : ""}${esc(config.url.replace(/^https?:\/\//, ""))}</div></div>`;
     }
     plan.shots.push(p);
     if (s.kind === "intro") return "";
@@ -257,9 +269,9 @@ export function compose(video: Video, script: Script, config: Config): Composed 
   const intro = script.shots[0]!;
   const wordmark = intro.wordmark ? inline(intro.wordmark) : esc(config.name);
   const nameSize = fit(plain(intro.wordmark ?? config.name).length, seal ? 800 : 940, 300, 96);
-  const introText = (intro.kicker ? `<div id="s1-kick" class="kick">${esc(intro.kicker)}</div>` : "")
-    + `<div class="mask" data-layout-allow-overflow><span id="s1-name" style="font-size: ${nameSize}px">${wordmark}</span></div>`
-    + tags.map((t, k) => `<div class="mask" data-layout-allow-overflow><span class="tag" id="s1-tag${k + 1}">${inline(t)}</span></div>`).join("");
+  const introText = (intro.kicker ? `<div id="s1-kick" class="kick"${fitAttrs("the kicker", 18)}>${esc(intro.kicker)}</div>` : "")
+    + `<div class="mask" data-layout-allow-overflow><span id="s1-name" style="font-size: ${nameSize}px"${fitAttrs("the name", 72)}>${wordmark}</span></div>`
+    + tags.map((t, k) => `<div class="mask" data-layout-allow-overflow><span class="tag" id="s1-tag${k + 1}"${fitAttrs(`the tagline's line ${k + 1}`, 36, 1, "s1-tags")}>${inline(t)}</span></div>`).join("");
   const introHtml = seal
     ? `<div id="s1" class="clip intro-seal" data-start="0" data-duration="${r3(INTRO + HALF)}" data-track-index="1" data-track-kind="graphics">
         <div id="s1-cam">${introText}</div>

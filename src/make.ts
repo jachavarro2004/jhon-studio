@@ -10,9 +10,10 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { capture } from "./capture.ts";
 import { compose } from "./compose.ts";
-import { screensDir, type Config } from "./config.ts";
+import { chromeNoSandbox, screensDir, type Config } from "./config.ts";
 import { narrate, narrationDir } from "./narrate.ts";
 import { commandLine, needApproval, renderJobs, runJobs } from "./render.ts";
+import { checkFit, fitLine } from "./review.ts";
 import { loadScript, validateScript } from "./script.ts";
 import { StudioError, type Video } from "./video.ts";
 
@@ -55,6 +56,7 @@ export async function make(video: Video, config: Config, say: (line: string) => 
   say(`narrate: ${new Set(Object.values(spoken).map((v) => v.key)).size} lines, in narration/`);
   const c = compose(video, script, config);
   say(`compose: ${c.total} s, ${c.shots} shots -> index.html`);
+  say(`compose: ${fitLine(await checkFit(video, config))}`);
 
   // render
   try {
@@ -63,7 +65,7 @@ export async function make(video: Video, config: Config, say: (line: string) => 
     throw new WaitError(`video make stopped before the render: ${(e as Error).message}`);
   }
   const shared = [join(video.dir, "index.html"), ...filesIn(narrationDir(video.dir)), ...filesIn(screensDir(config, video.project, video.dir)), ...filesIn(join(video.dir, "assets")).filter((f) => /\/mark\.\w+$/.test(f))];
-  const jobs = renderJobs(video, script, config.languages, config.narration).filter((j) => {
+  const jobs = renderJobs(video, script, config.languages, config.narration, { noSandbox: chromeNoSandbox(config) }).filter((j) => {
     const fresh = upToDate(j.out, [...shared, join(video.dir, `captions.${j.lang}.json`)]);
     if (fresh) say(`render: ${relative(video.dir, j.out)} is up to date`);
     return !fresh;

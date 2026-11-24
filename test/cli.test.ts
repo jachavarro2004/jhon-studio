@@ -13,7 +13,7 @@ import { KINDS, lines, validateScript } from "../src/script.ts";
 import { parseYaml } from "../src/yaml.ts";
 import { SAMPLE_VIDEO, cli, sampleCopy, scratch } from "./helpers.ts";
 
-const COMMANDS = [[], ["init"], ["doctor"], ["video"], ["video", "narrate"], ["video", "compose"], ["video", "render"], ["video", "script"], ["video", "brief"], ["video", "capture"], ["video", "make"], ["integration"]];
+const COMMANDS = [[], ["init"], ["doctor"], ["video"], ["video", "narrate"], ["video", "compose"], ["video", "render"], ["video", "script"], ["video", "brief"], ["video", "capture"], ["video", "make"], ["video", "review"], ["integration"]];
 
 test("--help for every command: its usage on stdout, exit 0", () => {
   for (const c of COMMANDS) {
@@ -25,7 +25,7 @@ test("--help for every command: its usage on stdout, exit 0", () => {
     }
   }
   const top = cli(["--help"]).stdout;
-  for (const c of ["init", "video brief", "video script", "video capture", "video narrate", "video compose", "video render", "video make", "doctor", "integration", "--version"]) assert.ok(top.includes(c), `the top help names ${c}`);
+  for (const c of ["init", "video brief", "video script", "video capture", "video narrate", "video compose", "video render", "video make", "video review", "doctor", "integration", "--version"]) assert.ok(top.includes(c), `the top help names ${c}`);
 });
 
 test("an unknown command or flag is a usage error: exit 2, the usage on stderr", () => {
@@ -52,7 +52,7 @@ test("video script, bare: the shot model with one valid example of each kind, th
   assert.deepEqual(new Set(example.shots.map((x: { kind: string }) => x.kind)), new Set(KINDS), "one of each kind");
   assert.match(o, /Screens \(a proof's src\):\n- pantry\.png \(1600x900, screens\/pantry\.png\)\n- week\.png \(1600x900, screens\/week\.png\)\n/);
   assert.ok(o.includes(readFileSync(join(video, "brief.md"), "utf8")), "the brief, as it is");
-  assert.match(o, /When it is written: jhon-studio video script --check; the owner reads it and approves it/);
+  assert.match(o, /When it is written: jhon-studio video script --check; jhon-studio video make \(a preview\);\njhon-studio video review \(review\.png, .*\); the owner\nreads it and approves it/);
 });
 
 test("video script, bare, in Spanish narration and before any brief: the example speaks Spanish, and it says to draft a brief", (t) => {

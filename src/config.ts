@@ -59,6 +59,8 @@ export interface Config {
   screens: string;
   /** What `video capture` makes, when studio.yaml lists screens; else null. */
   captures: Capture[] | null;
+  /** studio.yaml `capture: chrome_no_sandbox`: start Chrome without its own sandbox (see chromeNoSandbox). */
+  chromeNoSandbox: boolean;
 }
 
 export class ConfigError extends Error {}
@@ -144,6 +146,7 @@ export function guessConfig(project: string): Config {
     languages: ["en", "es"],
     screens: SCREEN_DIRS.find((d) => existsSync(join(project, d)) && statSync(join(project, d)).isDirectory()) ?? SCREEN_DIRS[0]!,
     captures: null,
+    chromeNoSandbox: false,
   };
 }
 
@@ -152,7 +155,7 @@ export const screensDir = (c: Config, project: string, videoDir: string) => (c.c
 
 // ---- Reading .jhon/studio.yaml
 
-const KEYS = ["name", "tagline", "url", "palette", "mark", "intro", "voice", "narration", "subtitles", "languages", "screens"];
+const KEYS = ["name", "tagline", "url", "palette", "mark", "intro", "voice", "narration", "subtitles", "languages", "screens", "capture"];
 const isMap = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -219,6 +222,14 @@ export function loadConfig(project: string): Config {
     c.subtitles = [...new Set(l as Lang[])];
   }
   c.languages = [c.narration, ...c.subtitles];
+  if ("capture" in doc && doc.capture !== null) {
+    if (!isMap(doc.capture)) bad("capture: a mapping (chrome_no_sandbox: true or false)");
+    for (const [k, v] of Object.entries(doc.capture as Record<string, unknown>)) {
+      if (k !== "chrome_no_sandbox") bad(`unknown key "capture.${k}" (known: chrome_no_sandbox)`);
+      if (typeof v !== "boolean") bad(`capture.chrome_no_sandbox: true or false, got ${JSON.stringify(v)}`);
+      c.chromeNoSandbox = v as boolean;
+    }
+  }
   c.voice = "voice" in doc && doc.voice !== null ? str("voice", doc.voice) : DEFAULT_VOICES[c.narration];
   return c;
 }
@@ -336,6 +347,19 @@ export function kokoroDir(env: NodeJS.ProcessEnv = process.env, home = homedir()
   if (env.JHON_MEDIA_KOKORO) return env.JHON_MEDIA_KOKORO;
   const fresh = join(home, ".cache", "jhon-studio", "kokoro"), old = join(home, ".cache", "jhon-media", "kokoro");
   return !existsSync(fresh) && existsSync(old) ? old : fresh;
+}
+
+/**
+ * Whether the studio starts Chrome without its own sandbox: $JHON_STUDIO_CHROME_NO_SANDBOX (1 or
+ * true: yes; 0 or false: no) over the project's `capture: chrome_no_sandbox` (false by default).
+ * Chrome's sandbox needs user namespaces; inside a sandbox that allows none (such as Jhon's)
+ * Chrome dies with "No usable sandbox!", and only then is this worth turning on.
+ */
+export function chromeNoSandbox(config: Pick<Config, "chromeNoSandbox"> | null, env: NodeJS.ProcessEnv = process.env): boolean {
+  const v = (env.JHON_STUDIO_CHROME_NO_SANDBOX ?? "").trim().toLowerCase();
+  if (v === "1" || v === "true") return true;
+  if (v === "0" || v === "false") return false;
+  return config?.chromeNoSandbox ?? false;
 }
 
 /** chrome-headless-shell: $JHON_STUDIO_CHROME, $JHON_MEDIA_CHROME, else the newest the HyperFrames CLI keeps; "" when there is none. */
