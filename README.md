@@ -316,17 +316,9 @@ drawn by `node test/fixtures/sample-screens.mjs` (ffmpeg).
 Contributions: [CONTRIBUTING.md](CONTRIBUTING.md); questions and help: [SUPPORT.md](SUPPORT.md);
 security problems, privately: [SECURITY.md](SECURITY.md).
 
-## The Jhon family
+## Support jhon-studio
 
-- **[jhon-agent](https://github.com/jachavarro2004/jhon-agent)**: the framework.
-- **jhon-studio**: presentation videos for any project (you are here).
-- **[The landing](https://jachavarro2004.github.io/jhon-site/)**: Jhon's site, jachavarro2004.github.io/jhon-site.
-- **[The profile](https://github.com/jachavarro2004)**: the author's GitHub profile, github.com/jachavarro2004.
-- **[YouTube](https://www.youtube.com/channel/UCprv0NKifqqMb-zzrBdXb9g)**: Jhon's films, a video for every release.
-
-## Support Jhon
-
-Jhon is free and open source.
+jhon-studio is free and open source.
 If it helps you, donate any amount you choose,
 once or monthly, on GitHub Sponsors.
 If you can't donate, a ⭐ on the repo helps
