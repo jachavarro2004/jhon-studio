@@ -7,9 +7,9 @@ it matters. Thank you for reporting one privately.
 
 ## Supported versions
 
-Only the latest version on `main` gets security fixes. Update with
-`git -C ~/.local/share/jhon-studio pull` before you report, and say which
-version you ran (`jhon-studio --version`).
+Only the latest release gets security fixes. Install the newest release
+(README, Install) before you report, and say which version you ran
+(`jhon-studio --version`).
 
 ## Reporting a vulnerability
 
