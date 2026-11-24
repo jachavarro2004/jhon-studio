@@ -97,7 +97,7 @@ SemVer range); `contract` the integration contract it speaks. A jhon outside the
 studio off for its run with one note, and works as it does with the studio off
 ([Releases](#releases)).
 
-Without Jhon, the plugin works on its own: `claude --plugin-dir ~/.local/share/jhon-studio/plugin/claude-code`.
+Without Jhon, the plugin works on its own: `claude --plugin-dir ~/.local/share/jhon-studio/0.1.0/plugin/claude-code` (the folder of the version you installed).
 
 ## The flow
 

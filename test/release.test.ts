@@ -10,7 +10,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT, scratch } from "./helpers.ts";
 import { CONTRACT, REPOSITORY, REQUIRES_JHON, SCHEMA, SIGNER_IDENTITY, SIGNER_ISSUER, VERSION } from "../src/version.ts";
@@ -240,4 +240,46 @@ test("release.yml runs the tests, refuses a tag that differs from VERSION, packs
   assert.match(w, /--prerelease --latest=false/);
   for (const ext of ["tar.gz", "tar.gz.sha256", "tar.gz.sigstore.json"]) assert.ok(w.includes(ext), ext);
   for (const uses of w.match(/uses: \S+/g) ?? []) assert.match(uses, /@[0-9a-f]{40}$/, `${uses}: pinned to a commit`);
+});
+
+// S4/T15 (verify B1, B2): every studio path a user copies is inside a version's folder; no clone-only update line.
+test("every ~/.local/share/jhon-studio path a user copies is inside a version's folder (README, SECURITY)", () => {
+  for (const file of ["README.md", "SECURITY.md"]) {
+    const text = readFileSync(join(ROOT, file), "utf8");
+    assert.doesNotMatch(text, /git -C ~\/\.local\/share\/jhon-studio/, `${file}: a release install is no clone`);
+    const dev = text.indexOf("## Development");
+    for (const m of text.matchAll(/~\/\.local\/share\/jhon-studio(\/[^\s"'`)]*)?/g)) {
+      if (!m[1] || (dev > 0 && m.index! > dev)) continue;
+      assert.match(m[1], /^\/(\$V|<version>|\d+\.\d+\.\d+(-rc\.\d+)?)(\/|$)/, `${file}: ${m[0]}`);
+    }
+  }
+});
+
+// S4/T15 (verify check 4): README's install block, run against a local copy of the release, installs VERSION
+// and asks cosign for exactly the constants' signer.
+test("README's install block installs VERSION from the release's assets and verifies the release workflow's signature", (t) => {
+  const p = pack(t);
+  assert.equal(p.code, 0, p.stderr);
+  const s = realpathSync(scratch(t));
+  const rel = join(s, "release", `v${VERSION}`);
+  mkdirSync(rel, { recursive: true });
+  for (const f of [TARBALL, `${TARBALL}.sha256`]) copyFileSync(join(p.out, f), join(rel, f));
+  writeFileSync(join(rel, `${TARBALL}.sigstore.json`), "{}\n");
+  const stub = join(s, "stub");
+  mkdirSync(stub);
+  writeFileSync(join(stub, "cosign"), `#!/bin/sh\nprintf '%s\\n' "$@" > "${join(s, "cosign.args")}"\n`, { mode: 0o755 });
+  const home = join(s, "home");
+  mkdirSync(join(home, ".local", "bin"), { recursive: true });
+  const block = installBlock().split("\n").slice(1, -1).filter((l) => l !== "jhon-studio doctor")
+    .map((l) => (l.startsWith("R=") ? `R=file://${join(s, "release")}/v$V` : l)).join("\n");
+  const r = spawnSync("bash", ["-euo", "pipefail", "-c", `${block}\njhon-studio --version`], {
+    encoding: "utf8", env: { PATH: `${join(home, ".local", "bin")}:${stub}:${process.env.PATH}`, HOME: home, TMPDIR: s },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim().split("\n").at(-1), VERSION);
+  const args = readFileSync(join(s, "cosign.args"), "utf8").trim().split("\n");
+  assert.deepEqual(args, ["verify-blob", "--bundle", `${TARBALL}.sigstore.json`, "--certificate-identity",
+    `https://github.com/${REPOSITORY}/.github/workflows/release.yml@refs/tags/v${VERSION}`, "--certificate-oidc-issuer", SIGNER_ISSUER, TARBALL]);
+  assert.ok(new RegExp(SIGNER_IDENTITY).test(args[4]!), "README's identity is one the workflow's pattern accepts");
+  assert.equal(realpathSync(join(home, ".local", "bin", "jhon-studio")), join(home, ".local", "share", "jhon-studio", VERSION, "bin", "jhon-studio"));
 });
