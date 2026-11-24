@@ -6,7 +6,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { key } from "../src/narrate.ts";
 import { lines } from "../src/script.ts";
@@ -80,6 +80,7 @@ test("the composition runs on the studio's motion engine alone, the flat 2D intr
   const srcs = [...html.matchAll(/src="(assets\/screens\/[^"]+)"/g)].map((m) => m[1]!);
   assert.equal(srcs.length, 2, "the sample's two screens");
   for (const src of srcs) assert.ok(existsSync(join(video, src)), `${src} does not load from the video folder`);
+  assert.equal(readlinkSync(join(video, "assets", "screens")), "../../../../screens", "the project's screens linked relatively: the project can move");
   for (const f of ["fraunces.woff", "space-grotesk-regular.woff", "firacode-medium.woff"]) assert.ok(existsSync(join(video, "assets", "fonts", f)), f);
 });
 

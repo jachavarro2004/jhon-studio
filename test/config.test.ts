@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { DEFAULT_PALETTE, DEFAULT_VOICE, chromePath, derivePalette, guessConfig, kokoroDir, loadConfig } from "../src/config.ts";
+import { DEFAULT_PALETTE, DEFAULT_VOICE, DEFAULT_VOICES, chromePath, derivePalette, guessConfig, kokoroDir, loadConfig } from "../src/config.ts";
 import { scratch } from "./helpers.ts";
 
 const git = (cwd: string, ...args: string[]) => execFileSync("git", ["-c", "init.defaultBranch=main", ...args], { cwd, stdio: "pipe" });
@@ -28,8 +28,11 @@ test("defaults: name and tagline from the README's H1 and first sentence, url fr
     mark: { glyph: "T" },
     intro: "flat",
     voice: "af_heart",
+    narration: "en",
+    subtitles: ["es"],
     languages: ["en", "es"],
     screens: "docs/screens",
+    captures: null,
   });
   assert.equal(DEFAULT_VOICE, "af_heart");
   // Neutral ink: every default colour is a grey (its channels within 24 of each other), so no hue of anyone's brand.
@@ -79,6 +82,81 @@ test("studio.yaml overrides the defaults; a partial palette keeps the default fo
   assert.deepEqual(c.languages, ["en"]);
   assert.equal(c.screens, "screens");
   assert.equal(c.voice, "bf_emma");
+});
+
+test("narration: en or es, subtitled in the others; the voice follows the narration's language unless studio.yaml names one", (t) => {
+  const dir = scratch(t);
+  mkdirSync(join(dir, ".jhon"));
+  const yaml = (s: string) => { writeFileSync(join(dir, ".jhon", "studio.yaml"), s); return loadConfig(dir); };
+  assert.deepEqual(DEFAULT_VOICES, { en: "af_heart", es: "ef_dora" });
+  let c = yaml("narration: es\nsubtitles: [en]\n");
+  assert.deepEqual([c.narration, c.subtitles, c.languages, c.voice], ["es", ["en"], ["es", "en"], "ef_dora"]);
+  c = yaml("narration: es\n");
+  assert.deepEqual([c.narration, c.subtitles, c.languages], ["es", ["en"], ["es", "en"]], "the default subtitles are the other language");
+  c = yaml("subtitles: []\n");
+  assert.deepEqual([c.narration, c.subtitles, c.languages, c.voice], ["en", [], ["en"], "af_heart"]);
+  c = yaml("narration: es\nvoice: em_alex\n");
+  assert.equal(c.voice, "em_alex");
+  c = yaml("languages: [en]\n");
+  assert.deepEqual([c.narration, c.subtitles, c.languages], ["en", [], ["en"]], "languages, the older spelling: the narration's, then the subtitles");
+});
+
+test("screens may list what capture makes: files copied, web pages captured, commands run; each checked", (t) => {
+  const dir = scratch(t);
+  mkdirSync(join(dir, ".jhon"));
+  writeFileSync(join(dir, ".jhon", "studio.yaml"), [
+    "screens:",
+    "  - file: docs/pantry.png",
+    "  - file: art/plan.svg",
+    "    name: week.svg",
+    "  - web:",
+    "      url: http://localhost:5173/",
+    "      name: home",
+    "      steps:",
+    '        - click: "#plan"',
+    '        - fill: ["#search", "rice"]',
+    "        - wait: 250",
+    '        - wait: ".done"',
+    "        - scroll: 400",
+    "        - goto: http://localhost:5173/list",
+    "  - cli:",
+    "      command: [larder, plan, --week]",
+    "      name: plan",
+    "",
+  ].join("\n"));
+  const c = loadConfig(dir);
+  assert.equal(c.screens, "");
+  assert.deepEqual(c.captures, [
+    { kind: "file", name: "pantry.png", file: "docs/pantry.png" },
+    { kind: "file", name: "week.svg", file: "art/plan.svg" },
+    { kind: "web", name: "home.png", url: "http://localhost:5173/", viewport: [1600, 900], scale: 1, steps: [
+      { click: "#plan" }, { fill: ["#search", "rice"] }, { wait: 250 }, { wait: ".done" }, { scroll: 400 }, { goto: "http://localhost:5173/list" },
+    ] },
+    { kind: "cli", name: "plan.svg", command: ["larder", "plan", "--week"], cols: 100, timeout: 30 },
+  ]);
+});
+
+test("a screens list is checked: one kind per item, a command is an argv list, names unique, steps known", (t) => {
+  const dir = scratch(t);
+  mkdirSync(join(dir, ".jhon"));
+  const bad: [string, RegExp][] = [
+    ["screens:\n  - cli:\n      command: larder plan --week\n      name: plan\n", /screens\[0\]\.cli\.command: a list of arguments \(\[program, arg, \.\.\.\]\); a shell line is never run/],
+    ["screens:\n  - cli:\n      command: [larder]\n", /screens\[0\]\.cli\.name: the screen's name/],
+    ["screens:\n  - file: a.png\n    web: x\n", /screens\[0\]: one of file, web or cli/],
+    ["screens:\n  - shot: a.png\n", /screens\[0\]: one of file, web or cli/],
+    ["screens:\n  - file: a.jpg\n", /screens\[0\]\.file: a PNG or an SVG/],
+    ["screens:\n  - file: a.png\n  - file: b/a.png\n", /screens\[1\]: the name "a\.png" is taken by screens\[0\]/],
+    ["screens:\n  - web:\n      url: http://x/\n      name: a\n      steps:\n        - hover: \"#a\"\n", /screens\[0\]\.web\.steps\[0\]: one of click, fill, wait, goto, scroll/],
+    ["screens:\n  - web:\n      url: http://x/\n      name: a\n      viewport: [10]\n", /screens\[0\]\.web\.viewport: \[width, height\]/],
+    ["screens:\n  - web:\n      name: a\n", /screens\[0\]\.web\.url: the page's address/],
+    ["narration: fr\n", /narration: en or es, got "fr"/],
+    ["subtitles: [en]\n", /subtitles: the languages besides the narration's \(en\), from en, es/],
+    ["subtitles: [es]\nlanguages: [en, es]\n", /languages: the older spelling of narration and subtitles; use those alone/],
+  ];
+  for (const [yaml, re] of bad) {
+    writeFileSync(join(dir, ".jhon", "studio.yaml"), yaml);
+    assert.throws(() => loadConfig(dir), re, yaml);
+  }
 });
 
 test("studio.yaml is checked: unknown keys, bad colours, a mark with both or neither, a seal intro without a glyph", (t) => {

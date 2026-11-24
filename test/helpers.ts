@@ -1,5 +1,5 @@
 /** Shared test helpers: the repository's paths, scratch folders and running the CLI as a user does. */
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -48,4 +48,16 @@ export function cli(args: string[], opts: { env?: NodeJS.ProcessEnv; cwd?: strin
     env: opts.env ?? process.env,
   });
   return { code: r.status, stdout: r.stdout, stderr: r.stderr };
+}
+
+/** Runs bin/jhon-studio without blocking this process (a server the test runs keeps answering). */
+export function cliAsync(args: string[], opts: { env?: NodeJS.ProcessEnv; cwd?: string } = {}): Promise<Run> {
+  return new Promise((ok, no) => {
+    const p = spawn(process.execPath, ["--experimental-strip-types", "--no-warnings", BIN, ...args], { cwd: opts.cwd ?? ROOT, env: opts.env ?? process.env });
+    let stdout = "", stderr = "";
+    p.stdout.on("data", (d) => (stdout += d));
+    p.stderr.on("data", (d) => (stderr += d));
+    p.on("error", no);
+    p.on("close", (code) => ok({ code, stdout, stderr }));
+  });
 }

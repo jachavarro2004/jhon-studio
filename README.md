@@ -1,8 +1,9 @@
 # jhon-studio
 
 Narrated presentation videos for any project, made by code: the project's own name, palette,
-logo and screens; a flat animated intro; real screens held close as proof; narration spoken
-locally by Kokoro; English captions and Spanish subtitles; rendered to MP4 by
+logo and screens; a flat animated intro; real screens held close as proof (images, command
+output, web pages); narration spoken locally by Kokoro in English or Spanish, subtitled in the
+other; rendered to MP4 by
 [HyperFrames](https://github.com/heygen-com/hyperframes) on the studio's own motion engine.
 
 It works on its own, in any project folder. It is also an opt-in integration of
@@ -10,15 +11,16 @@ It works on its own, in any project folder. It is also an opt-in integration of
 through `/jhon:video` (coming in a later version); with it off, Jhon shows and loads nothing
 about video.
 
-Status: the first version is in progress. The steps from a written `script.json` to the MP4
-(narrate, compose, render) work; drafting a brief, capturing screens and writing the script from
-a brief come next.
+Status: the first version is in progress. The whole flow works on any project (a web app, a
+command-line tool, a library): a brief drafted from its own text, a script written from it (by
+you or an agent) and approved, its screens captured, the narration spoken, the MP4s rendered.
 
 ## Install
 
 Needs Node 22 or newer (it runs the TypeScript sources with Node's type stripping: no build step,
-no dependencies), ffmpeg, and for narration and renders Kokoro and the HyperFrames CLI
-(`jhon-studio doctor` says what is missing and how to add it).
+no dependencies), ffmpeg, and for narration and renders Kokoro and the HyperFrames CLI; web
+screens are captured with the chrome-headless-shell HyperFrames keeps (`jhon-studio doctor` says
+what is missing and how to add it).
 
 ```sh
 git clone https://github.com/jachavarro2004/jhon-studio
@@ -26,48 +28,81 @@ ln -s "$PWD/jhon-studio/bin/jhon-studio" ~/.local/bin/jhon-studio   # any folder
 jhon-studio doctor
 ```
 
-## The steps
+## The flow
 
-Each step runs, and can be checked, on its own. A video lives in its project, in
-`.jhon/studio/<video>/`.
+A video lives in its project, in `.jhon/studio/<video>/`.
 
 ```sh
 cd my-project
-jhon-studio init                      # .jhon/studio.yaml with guessed defaults; edit it
-mkdir -p .jhon/studio/tour            # a video: write its script.json (below)
-jhon-studio video script --check      # kinds, fields, marks in order, subtitles
-jhon-studio video narrate             # Kokoro speaks each new line into narration/
-jhon-studio video compose             # index.html + captions.es.json
-jhon-studio video script --approve    # you read the script and approve it
-jhon-studio video render              # renders/tour.mp4 and renders/tour.es.mp4
+jhon-studio init                       # .jhon/studio.yaml with guessed defaults; edit it
+jhon-studio video brief readme         # .jhon/studio/tour/brief.md: what the video is made from
+jhon-studio video script               # the shot model, an example of each kind, the screens, the brief
+$EDITOR .jhon/studio/tour/script.json  # write the script (or have an agent write it)
+jhon-studio video script --check       # kinds, fields, marks in order, subtitles
+jhon-studio video make                 # capture, narrate, compose; stops for the approval (exit 3)
+jhon-studio video script --approve     # you read the script and approve it
+jhon-studio video make                 # renders/tour.mp4 and renders/tour.es.mp4
 ```
 
-`--project <dir>` points at another folder; `--video <id>` names the video when the project
-has more than one; `video render --lang en` renders one language; `--dry-run` prints the
-HyperFrames commands instead. Every command has `--help`. Exit codes: 0 done, 1 refused or
-failed, 2 a usage error or a step that is not there yet (`video brief`, `video capture`,
-writing a script).
+`video make` runs what is left, in order (capture, narrate, compose, render), and stops where
+you are needed, with exit 3 and what to do: no `script.json` yet, or a script not approved as
+it is now. It composes before it stops, so the video can be previewed (`npx hyperframes
+preview` in the video folder) before the approval. Each step also runs alone:
 
-`render` refuses until the script is approved (`"approved": true` in `script.json`, which
-`video script --approve` sets after validating it).
+| Step | What it does |
+| --- | --- |
+| `video brief <source>` | drafts `brief.md` from `readme`, `ldd:<change>` (`openspec/changes/<change>/` or `ldd/changes/<change>/`: proposal, design, tasks), `release:<tag>` (its CHANGELOG section, else `git log <previous tag>..<tag>`) or a file; text extraction only, no model |
+| `video script` | prints the shot model, a valid example of each kind in the narration's language, the screens and the brief; `--check` validates; `--approve` stores the script's hash |
+| `video capture` | makes the screens `studio.yaml` lists into `screens/` (files, commands, web pages) |
+| `video narrate` | speaks each new line with Kokoro into `narration/` (a line is spoken once) |
+| `video compose` | writes `index.html` and `captions.<lang>.json` |
+| `video render` | renders the MP4s with HyperFrames; refuses a script not approved as it is now |
+
+The approval is the script's hash (`"approved": { "sha256": ... }`, the SHA-256 of the script
+without that field): any change after it, a word or a mark, needs a new approval, and render
+says so: "the script changed after its approval: run jhon-studio video script --approve".
+
+`--project <dir>` points at another folder; `--video <id>` names the video when the project
+has more than one (`video brief` names it after its source: `tour`, the change, `release-<tag>`,
+the file's name); `video render --lang en` renders one language; `--dry-run` (render, make)
+prints the HyperFrames commands instead. Every command has `--help`. Exit codes: 0 done, 1
+refused or failed, 2 a usage error (or web screens with no Chrome), 3 `video make` stopped where
+you are needed.
 
 What a video folder holds:
 
 ```
 .jhon/studio/<video>/
-  script.json          the source: you write it (and approve it)
+  brief.md             what the script is written from (video brief drafts it; edit it)
+  script.json          the source: you write it, and approve it
+  screens/             GENERATED by capture, when studio.yaml lists screens
   narration/           <key>.opus and <key>.json per spoken line (cached; a line is spoken once)
   index.html           GENERATED: the HyperFrames composition
-  captions.es.json     GENERATED: the Spanish subtitles
-  assets/              GENERATED links: the studio's fonts, the project's screens, the narration; the logo
+  captions.<lang>.json GENERATED: the subtitles, one file per subtitle language
+  assets/              GENERATED links: the studio's fonts, the screens, the narration; the logo
   vendor/              GENERATED link to three.js (only for `intro: seal`)
-  renders/             the MP4s
+  renders/             the MP4s: <video>.mp4 in the narration's language, <video>.<lang>.mp4 subtitled
 ```
+
+## From an agent
+
+The studio has no model of its own: the brief is extracted, and the script is written by you or
+by an agent (Claude Code, pi; Jhon exposes it as `/jhon:video` when its studio integration is
+on). An agent's loop:
+
+1. `jhon-studio video brief readme` (or the change, the release, a file the user names), then
+   read `brief.md` and correct what the extraction got wrong with the user.
+2. `jhon-studio video script`: everything needed to write `script.json` (the kinds, the rules,
+   an example, the screens with their sizes, the brief). Write it; `--check` until it is valid.
+   Use only what the brief or the project shows: no invented figures.
+3. `jhon-studio video make`: exit 3 means the owner must read and approve the script; show it,
+   and let the owner run `jhon-studio video script --approve` (an agent never approves for them).
+4. `jhon-studio video make` again: the MP4s, in `renders/`.
 
 ## .jhon/studio.yaml
 
 Every key is optional; a missing one takes its default. The file is a small subset of YAML
-(mappings, lists, quoted or plain scalars, comments), read by the studio's own parser; anything
+(mappings, lists of scalars or of mappings, quoted or plain scalars, comments), read by the studio's own parser; anything
 outside the subset is refused with its line number. Quote colours: `"#1a2b3c"`.
 
 | Key | Default | Meaning |
@@ -78,9 +113,13 @@ outside the subset is refused with its line number. Quote colours: `"#1a2b3c"`.
 | `palette` | neutral ink: `accent: "#d2d6dc"`, `accent_fill: "#373b41"`, `ink: "#eef0f2"`, `page: "#18191c"` | four colours; every other tone is derived from them |
 | `mark` | `glyph:` the name's initial | `glyph: X` (one character, set on a square) or `path: assets/logo.svg` (SVG, PNG, JPEG or WebP) |
 | `intro` | `flat` | `flat`: the mark stamps down and the name inks beside it; `seal`: a 3D seal with the glyph (glyph marks only) |
-| `voice` | `af_heart` | the Kokoro voice of the narration |
-| `languages` | `[en, es]` | the videos rendered: English, and English narration with Spanish subtitles |
-| `screens` | the first of `docs/screens`, `docs/assets`, `screens`, `assets` that exists | the folder a proof's `src` is in |
+| `narration` | `en` | the language the lines are spoken in: `en` or `es` |
+| `subtitles` | the other language | the languages the lines are subtitled in (a render each); `[]` for none |
+| `voice` | `af_heart` for `en`, `ef_dora` for `es` | the Kokoro voice of the narration (any in `voices-v1.0.bin`) |
+| `screens` | the first of `docs/screens`, `docs/assets`, `screens`, `assets` that exists | the folder a proof's `src` is in, or a list of what `video capture` makes (below) |
+
+`languages: [en, es]`, the older spelling, still reads as the narration's language (`en` unless
+`narration` says otherwise) and the others as subtitles.
 
 ```yaml
 name: Larder
@@ -93,9 +132,41 @@ palette:
   page: "#141a19"
 mark:
   path: assets/logo.svg
-languages: [en, es]
+narration: en
+subtitles: [es]
 screens: screens
 ```
+
+### Screens to capture
+
+`screens` may list the screens instead of naming a folder; `video capture` (and `video make`)
+makes them into the video's `screens/`, and a proof's `src` is the name:
+
+```yaml
+screens:
+  - file: docs/pantry.png            # a PNG or SVG of the project, copied (name: to rename it)
+  - cli:                             # a command: plan.svg, a terminal in the project's palette
+      command: [larder, plan, --week]  # an argv list, run in the project; never a shell line
+      name: plan
+      cols: 72                       # the terminal's width (default 100); timeout: 30 (seconds)
+  - web:                             # a page in a headless Chrome: list.png
+      url: http://localhost:3000/list  # http, https, file, or a path in the project
+      name: list
+      viewport: [1600, 900]          # the default; scale: 2 for twice the pixels
+      steps:                         # run in order before the capture
+        - fill: ["#item", "Chickpeas"]
+        - click: "#add"
+        - wait: ".added"             # a selector to appear, or milliseconds
+        - scroll: 400                # pixels, or a selector to scroll to
+        - goto: /week                # another address (relative to the page's)
+```
+
+A command runs with colour forced on (`FORCE_COLOR`, `CLICOLOR_FORCE`, `COLUMNS`); one that
+fails or outlives its timeout is refused with its last lines. Web pages are driven over the
+Chrome DevTools Protocol with Node's own WebSocket (no npm dependency, no browser download):
+the chrome-headless-shell the HyperFrames CLI keeps (`npx --yes hyperframes@0.9.58 browser
+ensure`) or `$JHON_STUDIO_CHROME`; without one, web screens are refused with that fix and
+capture exits 2, after making every other screen. The app must be running for an http address.
 
 ## script.json
 
@@ -114,10 +185,12 @@ screens: screens
 }
 ```
 
-Every shot has an `id` (lowercase letters, digits, dashes), a `kind`, its one narration line
-`en` and its Spanish subtitle `es` (neutral Spanish in the tú form, two rows at most). A shot
-with a `chapter` opens under the band; `capEn: true` also captions the English line. The first
-shot is the `intro`, the last the `close`.
+Every shot has an `id` (lowercase letters, digits, dashes), a `kind`, and its line in each
+language: `en` and `es`. The narration's language (`narration` in studio.yaml) is spoken and
+times what lands; the others are its subtitles (two rows at most). Spanish is neutral, in the
+tú form. A shot with a `chapter` opens under the band; `capEn: true` also captions the spoken
+line. The first shot is the `intro`, the last the `close`. `video script` prints this model with
+an example of each kind.
 
 | Kind | Fields |
 | --- | --- |
@@ -129,14 +202,14 @@ shot is the `intro`, the last the `close`.
 | `proof` | `src`, `crop` `[x, y, w, h]` (default: the whole screen), `marks`: `{ at, r, delay }`, `pan`: `{ by, at }` |
 | `close` | `lines` (default: the tagline), `install` (a command shown above the url) |
 
-A `phrase` (and a mark's `at`) is words of the shot's `en`: the element lands when they are
-said. A proof's marks follow the line in order; only the first may be a time in seconds. Text
+A `phrase` (and a mark's `at`) is words of the shot's spoken line (its `en`, or its `es` when
+the narration is Spanish): the element lands when they are said. A proof's marks follow the line in order; only the first may be a time in seconds. Text
 may carry `*emphasis*` and `` `code` ``. `say` spells words as they should be heard (whole
 words; backticks are always dropped). `timing` may set `TAIL`, `PROOF_TAIL`, `PROOF_MIN` and
 `CLOSE_TAIL` in seconds.
 
 The sample project, [examples/sample-project](examples/sample-project) (a fictional app), has a
-full eight-shot script.
+full eight-shot script, a command (`bin/larder.mjs`) and a page (`web/index.html`) to capture.
 
 ## doctor
 
@@ -174,14 +247,16 @@ node --experimental-strip-types --no-warnings --test test/*.test.ts
 ```
 
 The tests need no model, GPU or network: compose runs on the sample project with fixture
-narration (`test/fixtures/sample-narration`, each line's seconds), doctor on a fake PATH. A
-hygiene test keeps the repository generic. CI runs them on Node 22. The sample's screens are
+narration (`test/fixtures/sample-narration`, each line's seconds), doctor on a fake PATH, web
+capture against a page the test serves with `node:http` (skipped, with the reason, when no
+chrome-headless-shell is found). A hygiene test keeps the repository generic. CI runs them on
+Node 22, 24 and the current LTS. The sample's screens are
 drawn by `node test/fixtures/sample-screens.mjs` (ffmpeg).
 
 | Path | What |
 | --- | --- |
 | `bin/jhon-studio` | the entry |
-| `src/` | the CLI, settings, script, narrate, compose, render, doctor, the YAML subset |
+| `src/` | the CLI, settings, brief, script and its reference, capture (ANSI to SVG, Chrome over CDP), narrate, compose, render, make, doctor, the YAML subset |
 | `engine/motion.js` | the motion engine: deterministic timelines HyperFrames seeks frame by frame |
 | `templates/presentation/` | the style, the timeline and the 3D seal's stage |
 | `voice/kokoro.py` | speaks lines with Kokoro (run by narrate in the Kokoro venv) |

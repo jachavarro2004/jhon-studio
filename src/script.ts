@@ -1,14 +1,15 @@
 /**
  * src/script.ts — a video's script: script.json in its folder (.jhon/studio/<video>/).
  *
- *   { "approved": false,                  set by `jhon-studio video script --approve`
+ *   { "approved": false,                  `jhon-studio video script --approve` sets { "sha256": ... }
  *     "say": { "CLI": "C L I" },          how words are spoken (whole words; backticks are always dropped)
  *     "timing": { "TAIL": 0.55 },         optional: TAIL, PROOF_TAIL, PROOF_MIN, CLOSE_TAIL in seconds
  *     "shots": [ ... ] }
  *
- * Every shot has an `id` (lowercase letters, digits, dashes), a `kind`, its one narration line
- * `en` (written; spoken through `say`) and its Spanish subtitle `es`; `chapter` opens it under
- * the band; `capEn` also shows the English line as a caption. By kind:
+ * Every shot has an `id` (lowercase letters, digits, dashes), a `kind`, and its line in each
+ * language, `en` and `es`: the narration's language (studio.yaml `narration`, English by default)
+ * is spoken (through `say`) and times what lands, the others are its subtitles; `chapter` opens it
+ * under the band; `capEn` also shows the spoken line as a caption. By kind:
  *   intro    the project's mark and name; `tags` (one or two lines; default: the tagline), `kicker`
  *   head     a headline: `lead` (optional), `lines`: one or two [text, phrase said when it lands]
  *   card     a claim: `kicker`, `title` (lines), `body`: [text, phrase], `size` (title px)
@@ -19,7 +20,11 @@
  *            delay }], `pan`: { by: px, at }
  *   close    the mark again; `lines` (default: the tagline), `install` (a command shown above the url)
  * Text may carry *emphasis* (the accent's italic) and `code` (the mono face).
+ *
+ * The approval is the script's own hash: `approved: { sha256 }` of the script without that field
+ * (scriptHash), so any change after the approval needs a new one before the render.
  */
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 export const KINDS = ["intro", "head", "card", "list", "numbers", "proof", "close"] as const;
@@ -27,7 +32,7 @@ export type Kind = (typeof KINDS)[number];
 export type Phrase = string | number;
 export interface Mark { at: Phrase; r: [number, number, number, number]; delay?: number }
 export interface Shot {
-  id: string; kind: Kind; en: string; es?: string; chapter?: string; capEn?: boolean;
+  id: string; kind: Kind; en: string; es: string; chapter?: string; capEn?: boolean;
   kicker?: string; tags?: string[]; wordmark?: string;
   lead?: string; lines?: (string | [string, string])[];
   title?: string[]; body?: [string, string][]; size?: number;
@@ -35,7 +40,7 @@ export interface Shot {
   src?: string; crop?: [number, number, number, number]; marks?: Mark[]; pan?: { by: number; at: Phrase };
   install?: string;
 }
-export interface Script { approved?: boolean; say?: Record<string, string>; timing?: Record<string, number>; shots: Shot[] }
+export interface Script { approved?: false | { sha256: string }; say?: Record<string, string>; timing?: Record<string, number>; shots: Shot[] }
 
 /** Ids the composition itself uses. */
 const RESERVED = new Set(["s1", "bg", "bg-in", "pool", "stage", "grain", "vig", "captions", "root"]);
@@ -56,14 +61,30 @@ export function spoken(text: string, say: Record<string, string> | undefined): s
   return s;
 }
 
-/** The distinct spoken lines, by the first shot that says each (the close may say the intro's line again). */
-export function lines(script: Script): { id: string; text: string }[] {
+/** A shot's line in a language. */
+export const said = (s: Shot, lang = "en"): string => (s as unknown as Record<string, string>)[lang] ?? "";
+
+/** The distinct spoken lines in the narration's language, by the first shot that says each (the close may say the intro's line again). */
+export function lines(script: Script, lang = "en"): { id: string; text: string }[] {
   const seen = new Map<string, string>();
   for (const s of script.shots) {
-    const t = spoken(s.en, script.say);
+    const t = spoken(said(s, lang), script.say);
     if (!seen.has(t)) seen.set(t, s.id);
   }
   return [...seen].map(([text, id]) => ({ id, text }));
+}
+
+/** The script's hash, the approval's proof: SHA-256 of its JSON without the approved field. */
+export function scriptHash(script: Script): string {
+  const { approved: _, ...rest } = script;
+  return createHash("sha256").update(JSON.stringify(rest)).digest("hex");
+}
+
+/** Whether the script is approved as it is now, changed after its approval, or never approved. */
+export function approval(script: Script): "approved" | "changed" | "none" {
+  const a = script.approved;
+  if (!a || typeof a !== "object" || typeof a.sha256 !== "string") return "none";
+  return a.sha256 === scriptHash(script) ? "approved" : "changed";
 }
 
 /** Reads script.json. */
@@ -79,12 +100,19 @@ const isStr = (v: unknown): v is string => typeof v === "string" && v.trim() !==
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const isRect = (v: unknown) => Array.isArray(v) && v.length === 4 && v.every(isNum);
 
-/** Every problem of a script, as "<shot id>: <problem>"; [] when it is valid. */
-export function validateScript(script: unknown, opts: { languages: string[] }): string[] {
+const NAMES: Record<string, string> = { en: "English", es: "Spanish" };
+
+/**
+ * Every problem of a script, as "<shot id>: <problem>"; [] when it is valid. `narration` is the
+ * spoken language (default en); `languages` the narration's and the subtitles'.
+ */
+export function validateScript(script: unknown, opts: { languages: string[]; narration?: string }): string[] {
   const errs: string[] = [];
   if (!script || typeof script !== "object" || Array.isArray(script)) return ["the script is a JSON object with its shots"];
   const sc = script as Script;
-  if ("approved" in sc && typeof sc.approved !== "boolean") errs.push("approved: true or false");
+  const voice = opts.narration ?? "en";
+  if ("approved" in sc && sc.approved !== false && !(sc.approved && typeof sc.approved === "object" && Object.keys(sc.approved).length === 1 && typeof sc.approved.sha256 === "string" && /^[0-9a-f]{64}$/.test(sc.approved.sha256)))
+    errs.push('approved: false, or { "sha256": ... } as `jhon-studio video script --approve` writes it');
   if ("say" in sc && (!sc.say || typeof sc.say !== "object" || Array.isArray(sc.say) || Object.values(sc.say).some((v) => typeof v !== "string")))
     errs.push("say: a map of written words to how they are spoken");
   if ("timing" in sc && (!sc.timing || typeof sc.timing !== "object" || Object.entries(sc.timing).some(([k, v]) => !["TAIL", "PROOF_TAIL", "PROOF_MIN", "CLOSE_TAIL"].includes(k) || !isNum(v) || v < 0)))
@@ -105,26 +133,29 @@ export function validateScript(script: unknown, opts: { languages: string[] }): 
     if (i > 0 && s.kind === "intro") e("an intro may only open the video");
     if (i === sc.shots.length - 1 && s.kind !== "close") errs.push("the last shot is the close");
     if (i < sc.shots.length - 1 && s.kind === "close") e("a close may only end the video");
-    if (!isStr(s.en)) return void e("en: its narration line");
+    const line = (s as unknown as Record<string, unknown>)[voice];
+    if (!isStr(line)) return void e(`${voice}: its narration line`);
     if ("chapter" in s && !isStr(s.chapter)) e("chapter: a string");
     if ("capEn" in s && typeof s.capEn !== "boolean") e("capEn: true or false");
+    const voseo = (text: string, what: string) => {
+      const vos = [...text.matchAll(VOSEO)].map((m) => `"${m[0]}"`);
+      if (vos.length) e(`voseo in the es ${what} (${vos.join(", ")}): use the tú form`);
+    };
+    if (voice === "es") voseo(line, "line");
 
-    for (const lang of opts.languages.filter((l) => l !== "en")) {
+    for (const lang of opts.languages.filter((l) => l !== voice)) {
       const sub = (s as unknown as Record<string, unknown>)[lang];
       if (!isStr(sub)) { e(`no ${lang} subtitle`); continue; }
       const text = sub.replace(/`/g, "");
-      if (text.trim() === s.en.replace(/`/g, "").trim()) e(`the ${lang} subtitle repeats the English`);
-      if (lang === "es") {
-        const vos = [...text.matchAll(VOSEO)].map((m) => `"${m[0]}"`);
-        if (vos.length) e(`voseo in the es subtitle (${vos.join(", ")}): use the tú form`);
-      }
+      if (text.trim() === line.replace(/`/g, "").trim()) e(`the ${lang} subtitle repeats the ${NAMES[voice] ?? voice}`);
+      if (lang === "es") voseo(text, "subtitle");
       if (text.length > MAX_SUBTITLE) e(`the ${lang} subtitle has ${text.length} characters; two rows hold ${MAX_SUBTITLE}`);
     }
 
-    /** A phrase that times something must be in the line. */
+    /** A phrase that times something must be in the spoken line. */
     const said = (what: string, p: unknown) => {
       if (!isStr(p)) { e(`${what}: the phrase it lands on`); return -1; }
-      const at = s.en.indexOf(p);
+      const at = line.indexOf(p);
       if (at < 0) e(`${what}: "${p}" is not in its line`);
       return at;
     };

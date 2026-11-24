@@ -30,19 +30,31 @@ function page(ids: string[]) {
 }
 const styles = (els: Record<string, El>) => JSON.stringify(Object.values(els).map((e) => [e.id, { ...e.style }]));
 
-test("each ease is the film's: 1,001 points of every ease it uses, the same float64 values as the reference", (t) => {
+/** How far an ease may be from the reference at any point: V8 versions differ in the last bits of Math.pow and Math.exp. */
+const TOLERANCE = 1e-12;
+
+test("each ease is the film's: 1,001 points of every ease it uses, each within 1e-12 of the reference", (t) => {
   // ease-reference.json was recorded from the eases the film was first made with (its "source"),
-  // before this engine replaced them: a SHA-256 of each ease's 1,001 values and every 100th value.
+  // before this engine replaced them: each ease's 1,001 values (float64le), their SHA-256 and
+  // every 100th value. The values are checked against the recorded hash, then every point of
+  // the engine against them with an absolute tolerance, not a byte hash: another Node's V8 may
+  // round the last bit of an exponential another way.
   const ref = JSON.parse(readFileSync(join(ROOT, "test", "ease-reference.json"), "utf8")).eases;
   const { motion } = page([]);
   assert.deepEqual(Object.keys(ref), EASES);
   for (const name of EASES) {
-    const f = motion.ease(name), buf = Buffer.alloc(1001 * 8);
-    for (let i = 0; i <= 1000; i++) buf.writeDoubleLE(f(i / 1000), i * 8);
-    const max = Math.max(...ref[name].every100.map((v: number, k: number) => Math.abs(f(k / 10) - v)));
-    t.diagnostic(`${name}: max |error| ${max} at every 100th point`);
-    assert.ok(max < 1e-9, `${name}: max error ${max}`);
-    assert.equal(createHash("sha256").update(buf).digest("hex"), ref[name].sha256, `${name}: its 1,001 values are not the reference's`);
+    const bytes = Buffer.from(ref[name].float64le, "base64");
+    assert.equal(bytes.length, 1001 * 8, `${name}: 1,001 reference values`);
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), ref[name].sha256, `${name}: the stored values are the recorded ones`);
+    ref[name].every100.forEach((v: number, k: number) => assert.equal(bytes.readDoubleLE(k * 800), v, `${name}: every100[${k}]`));
+    const f = motion.ease(name);
+    let max = 0, worst = 0;
+    for (let i = 0; i <= 1000; i++) {
+      const err = Math.abs(f(i / 1000) - bytes.readDoubleLE(i * 8));
+      if (err > max) { max = err; worst = i; }
+    }
+    t.diagnostic(`${name}: max |error| ${max} over 1,001 points${max ? ` (at p = ${worst / 1000})` : ""}`);
+    assert.ok(max <= TOLERANCE, `${name}: max |error| ${max} at p = ${worst / 1000} is over ${TOLERANCE}`);
   }
   assert.throws(() => motion.ease("bounce.out"), /bounce\.out/);
 });

@@ -2,11 +2,13 @@
  * src/yaml.ts — the YAML subset .jhon/studio.yaml is written in, with no dependency.
  *
  * Read: mappings by indentation (spaces only), `key: value` with keys of letters, digits, `_`
- * and `-`; lists of scalars, as block items (`- en`) or flow (`[en, es]`); scalars double-quoted
+ * and `-`; lists as block items (`- en`, or `- key: value` for a mapping whose other keys line
+ * up under the first) or flow lists of scalars (`[en, es]`); scalars double-quoted
  * (with \" \\ \n \t \uXXXX), single-quoted ('' for a quote) or plain (true, false, null, ~,
  * numbers, else a string); `#` comments at a line's start or after a space. Anything else
- * (anchors, tags, block scalars, flow mappings, mappings inside lists, documents after the
- * first) is refused with its line number, so a file never means something it does not say.
+ * (anchors, tags, block scalars, flow mappings, a list item that is itself a list, documents
+ * after the first) is refused with its line number, so a file never means something it does not
+ * say.
  */
 
 export type Scalar = string | number | boolean | null;
@@ -106,11 +108,18 @@ export function parseYaml(src: string): { [k: string]: Value } {
   function list(indent: number): Value[] {
     const out: Value[] = [];
     while (pos < lines.length && lines[pos]!.indent === indent && (lines[pos]!.text.startsWith("- ") || lines[pos]!.text === "-")) {
-      const l = lines[pos++]!;
+      const l = lines[pos]!;
       const item = l.text.slice(1).trim();
       if (item === "") fail(l.n, "an empty list item is not supported");
-      if (/^[A-Za-z0-9_-]+:(\s|$)/.test(item)) fail(l.n, "mappings inside lists are not supported");
-      if (item.startsWith("- ")) fail(l.n, "nested lists are not supported");
+      if (item.startsWith("- ") || item === "-") fail(l.n, "nested lists are not supported");
+      if (/^[A-Za-z0-9_-]+:(\s|$)/.test(item)) {
+        // A mapping: its first key sits after the dash; the rest line up under it.
+        const at = indent + l.text.length - l.text.slice(1).trimStart().length;
+        lines[pos] = { n: l.n, indent: at, text: item };
+        out.push(mapping(at));
+        continue;
+      }
+      pos++;
       out.push(item.startsWith("[") ? flowList(item, l.n) : scalar(item, l.n));
     }
     if (pos < lines.length && lines[pos]!.indent > indent) fail(lines[pos]!.n, "unexpected indent after a list");

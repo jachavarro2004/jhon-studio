@@ -1,6 +1,7 @@
 /**
  * The YAML subset studio.yaml is written in (src/yaml.ts): mappings by indentation, block and
- * flow lists of scalars, quoted and plain scalars, comments; anything else is refused by line.
+ * flow lists of scalars, block lists of mappings, quoted and plain scalars, comments; anything
+ * else is refused by line.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -62,12 +63,40 @@ test("what the subset does not support is refused with its line number", () => {
     ["a: &x 1\n", /line 1: .*anchors/],
     ["a: |\n  text\n", /line 1: .*block scalars/],
     ["a: {b: 1}\n", /line 1: .*flow mappings/],
-    ["a:\n  - b: 1\n", /line 2: .*mappings inside lists/],
+    ["a:\n  - - b\n", /line 2: .*nested lists/],
+    ["a:\n  - b: 1\n   c: 2\n", /line 3: .*indent/],
     ["a: 1\na: 2\n", /line 2: .*duplicate key "a"/],
     ["just text\n", /line 1: expected "key: value"/],
     ['a: "open\n', /line 1: .*unterminated/],
   ];
   for (const [src, re] of cases) assert.throws(() => parseYaml(src), re, JSON.stringify(src));
+});
+
+test("a list of mappings, as studio.yaml's screens are written: each item's keys line up under its first, nested mappings and lists inside", () => {
+  const doc = parseYaml(`screens:
+  - file: docs/pantry.png
+  - web:
+      url: http://localhost:5173/week
+      viewport: [1600, 900]
+      steps:
+        - click: "#plan"
+        - fill: ["#search", "rice"]
+        - wait: 300
+      name: week
+  -   cli:
+        command: [larder, plan, --week]
+        name: plan
+subtitles:
+- es
+`);
+  assert.deepEqual(doc, {
+    screens: [
+      { file: "docs/pantry.png" },
+      { web: { url: "http://localhost:5173/week", viewport: [1600, 900], steps: [{ click: "#plan" }, { fill: ["#search", "rice"] }, { wait: 300 }], name: "week" } },
+      { cli: { command: ["larder", "plan", "--week"], name: "plan" } },
+    ],
+    subtitles: ["es"],
+  });
 });
 
 test("stringifyYaml writes what parseYaml reads back, quoting what would not survive plain", () => {

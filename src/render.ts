@@ -1,33 +1,43 @@
 /**
  * src/render.ts — render a composed video to MP4 with the HyperFrames CLI, once per language.
  *
- * Only a script its owner approved is rendered (`jhon-studio video script --approve` sets
- * "approved": true). The CLI is pinned (src/config.ts HYPERFRAMES) and run with npx from the
+ * Only a script its owner approved, as it is now, is rendered (`jhon-studio video script
+ * --approve` stores the script's hash; an edit after it needs a new approval). The CLI is pinned (src/config.ts HYPERFRAMES) and run with npx from the
  * home folder, so the project gets no package.json or node_modules; telemetry and update checks
  * are off. `--no-browser-gpu` draws WebGL in software, which makes renders reproducible; crf 32
- * keeps a few minutes under 20 MB. English is the composition as it is (its English captions
- * where a shot asks for them); Spanish swaps in captions.es.json. Output: renders/<video>.mp4
- * and renders/<video>.es.mp4 in the video folder.
+ * keeps a few minutes under 20 MB. The narration's language is the composition as it is (its
+ * captions where a shot asks for them): renders/<video>.mp4; each subtitle language swaps in its
+ * captions.<lang>.json: renders/<video>.<lang>.mp4, in the video folder.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { HYPERFRAMES } from "./config.ts";
-import type { Script } from "./script.ts";
+import { approval, type Script } from "./script.ts";
 import { StudioError, type Video } from "./video.ts";
 
 export interface RenderJob { lang: string; out: string; args: string[]; env: Record<string, string>; cwd: string }
 
+/** Refuses a script not approved as it is now. */
+export function needApproval(video: Video, script: Script): void {
+  const a = approval(script);
+  if (a === "changed") throw new StudioError("the script changed after its approval: run jhon-studio video script --approve");
+  if (a !== "approved") throw new StudioError(`the script is not approved: read ${video.script}, then run \`jhon-studio video script --approve --project ${video.project} --video ${video.id}\``);
+}
+
+/** A render's file: the narration's language plain, a subtitle language with its code. */
+export const renderFile = (video: Video, lang: string, narration = "en") => join(video.dir, "renders", lang === narration ? `${video.id}.mp4` : `${video.id}.${lang}.mp4`);
+
 /** The render commands for the languages asked, after checking the script is approved and composed. */
-export function renderJobs(video: Video, script: Script, langs: string[]): RenderJob[] {
-  if (script.approved !== true) throw new StudioError(`the script is not approved: read ${video.script}, then run \`jhon-studio video script --approve --project ${video.project} --video ${video.id}\``);
+export function renderJobs(video: Video, script: Script, langs: string[], narration = "en"): RenderJob[] {
+  needApproval(video, script);
   const html = join(video.dir, "index.html");
   if (!existsSync(html)) throw new StudioError(`${html} does not exist: run \`jhon-studio video compose\` first`);
   return langs.map((lang) => {
-    const out = join(video.dir, "renders", lang === "en" ? `${video.id}.mp4` : `${video.id}.${lang}.mp4`);
-    const vars = lang === "en" ? [] : ["--variables-file", join(video.dir, `captions.${lang}.json`), "--strict-variables"];
-    if (vars.length && !existsSync(vars[1]!)) throw new StudioError(`${vars[1]} does not exist: add ${lang} to languages in .jhon/studio.yaml and compose again`);
+    const out = renderFile(video, lang, narration);
+    const vars = lang === narration ? [] : ["--variables-file", join(video.dir, `captions.${lang}.json`), "--strict-variables"];
+    if (vars.length && !existsSync(vars[1]!)) throw new StudioError(`${vars[1]} does not exist: add ${lang} to subtitles in .jhon/studio.yaml and compose again`);
     return {
       lang, out,
       args: ["--yes", HYPERFRAMES, "render", "--quality", "looks", "--crf", "32", "--no-browser-gpu", ...vars, "-o", out],

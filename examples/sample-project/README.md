@@ -12,10 +12,12 @@ jhon-studio's tests and examples make a video of it.
 ## The video
 
 `.jhon/studio.yaml` holds Larder's name, palette, logo and screens; `.jhon/studio/tour/script.json`
-is the video's script. From the jhon-studio repository:
+is the video's script. `bin/larder.mjs` (`node bin/larder.mjs plan --week`) and `web/index.html`
+are a command and a page to capture: list them under `screens` (see jhon-studio's README) to
+show them as proofs. From the jhon-studio repository:
 
 ```sh
+bin/jhon-studio video brief readme --project examples/sample-project
 bin/jhon-studio video script --check --project examples/sample-project
-bin/jhon-studio video narrate --project examples/sample-project    # needs Kokoro (jhon-studio doctor)
-bin/jhon-studio video compose --project examples/sample-project
+bin/jhon-studio video make --project examples/sample-project    # needs Kokoro and HyperFrames (jhon-studio doctor)
 ```

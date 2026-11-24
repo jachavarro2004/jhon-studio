@@ -10,11 +10,18 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest supported (22), 24, and the current LTS whatever its number.
+        node: [22, 24, lts/*]
+    name: test (node ${{ matrix.node }})
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
       - run: node --version
-      # No models, no GPU, no render: compose runs on fixture narration, doctor on a fake PATH.
+      # No models, no GPU, no render: compose runs on fixture narration, doctor on a fake PATH;
+      # web capture skips without a chrome-headless-shell.
       - run: node --experimental-strip-types --no-warnings --test test/*.test.ts

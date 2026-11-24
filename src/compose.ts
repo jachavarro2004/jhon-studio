@@ -17,12 +17,12 @@
  * or a body line lands where its phrase falls in the line (by its share of the line's
  * characters, which is close for Kokoro's even pace).
  */
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
-import { extname, join, resolve } from "node:path";
-import { STUDIO, derivePalette, type Config } from "./config.ts";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync } from "node:fs";
+import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { STUDIO, derivePalette, screensDir, type Config } from "./config.ts";
 import { key, narrationDir } from "./narrate.ts";
-import { spoken, validateScript, type Phrase, type Script, type Shot } from "./script.ts";
-import { StudioError, type Video } from "./video.ts";
+import { said, spoken, validateScript, type Phrase, type Script, type Shot } from "./script.ts";
+import { StudioError, writeIfChanged, type Video } from "./video.ts";
 
 const TEMPLATE = join(STUDIO, "templates", "presentation");
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
@@ -39,7 +39,7 @@ const BOX = { w: 1700, h: 790, cx: 960, cy: 462 };
 const LOGO_EXT = new Set([".svg", ".png", ".jpg", ".jpeg", ".webp"]);
 
 /** A screen's size in pixels: a PNG's header, an SVG's viewBox (or width and height), else 1280x720. */
-function imageSize(file: string): [number, number] {
+export function imageSize(file: string): [number, number] {
   const b = readFileSync(file);
   if (b.length > 24 && b.toString("ascii", 1, 4) === "PNG") return [b.readUInt32BE(16), b.readUInt32BE(20)];
   if (file.endsWith(".svg")) {
@@ -87,11 +87,12 @@ export interface Composed { total: number; shots: number; list: string; files: s
 
 /** Composes the video; writes nothing unless every input is there. */
 export function compose(video: Video, script: Script, config: Config): Composed {
-  const errs = validateScript(script, { languages: config.languages });
+  const N = config.narration;
+  const errs = validateScript(script, { languages: config.languages, narration: N });
   if (errs.length) throw new StudioError(`${video.script} is not valid:\n  ${errs.join("\n  ")}`);
   const DIR = narrationDir(video.dir);
   const T = { ...TIMING, ...(script.timing ?? {}) };
-  const screens = resolve(video.project, config.screens);
+  const screens = screensDir(config, video.project, video.dir);
   const palette = derivePalette(config.palette);
   const mark = "glyph" in config.mark ? { glyph: config.mark.glyph } : { file: resolve(video.project, config.mark.path) };
   let markSrc = "";
@@ -106,7 +107,7 @@ export function compose(video: Video, script: Script, config: Config): Composed 
   const markCls = markSrc ? " logo" : "";
 
   const voice = (s: Shot) => {
-    const f = join(DIR, `${key(spoken(s.en, script.say), config.voice)}.json`);
+    const f = join(DIR, `${key(spoken(said(s, N), script.say), config.voice, N)}.json`);
     if (!existsSync(f)) throw new StudioError(`no narration for shot "${s.id}": run \`jhon-studio video narrate --project ${video.project} --video ${video.id}\` first`);
     return JSON.parse(readFileSync(f, "utf8")) as { seconds: number };
   };
@@ -125,7 +126,7 @@ export function compose(video: Video, script: Script, config: Config): Composed 
     else if (s.kind === "close") { len = lead + v.seconds + T.CLOSE_TAIL; vo = start + lead; }
     else { len = lead + v.seconds + T.TAIL; vo = start + lead; }
     now = start + len;
-    return { s, i, seam, start, end: now, vo, sec: v.seconds, key: key(spoken(s.en, script.say), config.voice), clipStart: 0, clipEnd: 0, track: 0 };
+    return { s, i, seam, start, end: now, vo, sec: v.seconds, key: key(spoken(said(s, N), script.say), config.voice, N), clipStart: 0, clipEnd: 0, track: 0 };
   });
   const TOTAL = r3(now);
   timed.forEach((x, i) => {
@@ -139,9 +140,10 @@ export function compose(video: Video, script: Script, config: Config): Composed 
   /** When a phrase of the line is said. */
   function at(x: Timed, phrase: Phrase, delay = 0) {
     if (typeof phrase === "number") return r3(x.vo + phrase + delay);
-    const i = x.s.en.indexOf(phrase);
+    const line = said(x.s, N);
+    const i = line.indexOf(phrase);
     if (i < 0) throw new StudioError(`${x.s.id}: "${phrase}" is not in its line`);
-    return r3(x.vo + (x.sec * i) / x.s.en.length + delay);
+    return r3(x.vo + (x.sec * i) / line.length + delay);
   }
 
   const tags = script.shots[0]!.tags ?? taglineLines(config.tagline);
@@ -224,12 +226,12 @@ export function compose(video: Video, script: Script, config: Config): Composed 
   plan.bands = bands.map((m, k) => ({ band: `#band${k}-in`, at: r3(m.at - HALF), out: m.out, inn: m.inn }));
 
   // ---- Narration and subtitles (one per shot; a shot repeating another's line plays the same file)
-  const subtitleLangs = config.languages.filter((l) => l !== "en");
+  const subtitleLangs = config.subtitles;
   const vars: { id: string; type: string; label: string; default: string }[] = [], subs: Record<string, Record<string, string>> = {}, caps: string[] = [], audio: string[] = [];
   for (const l of subtitleLangs) subs[l] = {};
   for (const x of timed) {
     const v = `c_${x.s.id}`;
-    const en = x.s.capEn ? x.s.en.replace(/`/g, "") : "";
+    const en = x.s.capEn ? said(x.s, N).replace(/`/g, "") : "";
     vars.push({ id: v, type: "string", label: `Subtitle: ${x.s.id} (${r3(x.vo)} s)`, default: en });
     for (const l of subtitleLangs) subs[l]![v] = String((x.s as unknown as Record<string, string>)[l]).replace(/`/g, ""); // subtitles are plain text
     const capEnd = r3(x.vo + x.sec + 0.35);
@@ -282,7 +284,7 @@ export function compose(video: Video, script: Script, config: Config): Composed 
   ${TOTAL} s at 1920x1080, 30 fps. Shots (start-end, where the line starts, its length):
 ${shotList}
 -->
-<html lang="en" data-composition-variables='${JSON.stringify(vars).replace(/'/g, "&#39;")}'>
+<html lang="${N}" data-composition-variables='${JSON.stringify(vars).replace(/'/g, "&#39;")}'>
   <head>
     <meta charset="utf-8" />
     <style>
@@ -337,21 +339,25 @@ ${stageJs}
   mkdirSync(assets, { recursive: true });
   link(join(STUDIO, "fonts"), join(assets, "fonts"));
   link("../narration", join(assets, "narration"));
-  if (existsSync(screens)) link(screens, join(assets, "screens"));
+  if (existsSync(screens)) link(screens, join(assets, "screens"), video.project);
   if (seal) link(join(STUDIO, "vendor"), join(video.dir, "vendor"));
-  if (markSrc) copyFileSync((mark as { file: string }).file, join(video.dir, markSrc));
+  if (markSrc) writeIfChanged(join(video.dir, markSrc), readFileSync((mark as { file: string }).file));
   const files = [join(video.dir, "index.html")];
-  writeFileSync(files[0]!, html);
+  writeIfChanged(files[0]!, html);
   for (const l of subtitleLangs) {
     const f = join(video.dir, `captions.${l}.json`);
-    writeFileSync(f, JSON.stringify(subs[l], null, 2) + "\n");
+    writeIfChanged(f, JSON.stringify(subs[l], null, 2) + "\n");
     files.push(f);
   }
   return { total: TOTAL, shots: timed.length, list: shotList, files };
 }
 
-/** A symbolic link at `path` to `target`, made or corrected; never over a real file or folder. */
-function link(target: string, path: string) {
+/**
+ * A symbolic link at `path` to `target`, made or corrected; never over a real file or folder.
+ * A target inside `within` (the project) is linked relatively, so the project can move.
+ */
+function link(target: string, path: string, within?: string) {
+  if (within && isAbsolute(target) && !relative(within, target).startsWith("..")) target = relative(dirname(path), target) || ".";
   let st;
   try { st = lstatSync(path); } catch { st = null; }
   if (st && !st.isSymbolicLink()) throw new StudioError(`${path} exists and is not a link; move it away so compose can link it to ${target}`);
