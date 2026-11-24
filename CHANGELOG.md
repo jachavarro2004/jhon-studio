@@ -1,9 +1,13 @@
 # Changelog
 
 All notable changes to jhon-studio are recorded here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
+[Semantic Versioning](https://semver.org/) (`X.Y.Z`, pre-releases `X.Y.Z-rc.N`). Each release's
+notes are its section here.
 
-## [Unreleased]
+## [0.1.0]
+
+The first release. It runs with jhon `>=0.5.0-rc.1` (`requires_jhon`).
 
 ### Added
 
@@ -49,8 +53,23 @@ All notable changes to jhon-studio are recorded here. The format follows
   `/jhon:video` in pi runs the same `SKILL.md`. The skill walks doctor, init, brief, the script,
   a preview and the user's approval (never the agent's) to the MP4s.
 - `jhon-studio integration [--json]`: the version, the plugin folder and the skill, as absolute
-  paths in the studio's real folder (a link on PATH is followed), for Jhon's setup and doctor.
-- `jhon-studio --version`. The version is 0.1.0.
+  paths in the studio's real folder (a link on PATH is followed), for Jhon's setup and doctor;
+  also `schema` (its JSON's own schema, `jhon-studio.integration/v1`), `requires_jhon` (the jhon
+  versions it runs with, a SemVer range jhon reads) and `contract` (`jhon.integration/v1`), so
+  Jhon turns off a studio that needs a newer jhon instead of failing.
+- `jhon-studio --version`. `src/version.ts` is the one source of the version, the jhon it needs,
+  the contract and the release's signer; tests hold plugin.json, the README's install lines and
+  required jhon, the CHANGELOG's section and the release workflow to it.
+- Versioned, signed releases: a tag `vX.Y.Z` (or `vX.Y.Z-rc.N`, a pre-release) runs the tests,
+  is refused when it differs from the version, and publishes `jhon-studio-<version>.tar.gz`, its
+  `.sha256` and a cosign keyless signature bundle (`.sigstore.json`, signed through GitHub's
+  OIDC by the release workflow at that tag), with this file's section as the notes
+  (`.github/workflows/release.yml`). `tools/pack.sh` builds the tarball (the same files to the
+  same bytes; no tests, examples, docs or task files) and `tools/notes.sh` the notes, also
+  locally.
+- The README installs from a release (download, sha256, the signature, a folder per version
+  under `~/.local/share/jhon-studio/`, a link on PATH) and says what jhon each release needs;
+  `git clone` stays the development install.
 - `capture: chrome_no_sandbox: true` in `.jhon/studio.yaml` (false by default; the environment's
   `JHON_STUDIO_CHROME_NO_SANDBOX=1` or `0` overrides it): every Chrome the studio starts runs
   without Chrome's own sandbox (`--no-sandbox --disable-setuid-sandbox --no-zygote`), and the
@@ -86,7 +105,6 @@ All notable changes to jhon-studio are recorded here. The format follows
 - The tests run with a scratch HOME and XDG folders and without the environment's
   `JHON_STUDIO_*`/`JHON_MEDIA_*`, and the sample's narration cache is seeded whole, so `video
   make`'s tests no longer need Kokoro (CI, which has none, failed two of them).
-
 - `doctor` starts Chrome for real (headless, on about:blank, for up to 20 s) instead of only
   checking that its file exists, and honours `capture.chrome_no_sandbox` in the current
   folder's `.jhon/studio.yaml` and `JHON_STUDIO_CHROME_NO_SANDBOX`.

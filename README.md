@@ -5,12 +5,13 @@
 <h1 align="center">jhon-studio — presentation videos for any project</h1>
 
 <p align="center">
-  <b>Let the agent run. Deliver only what is proven.</b><br>
-  An agent framework for Claude Code and pi.
+  <b>Narrated presentation videos of any project, made by code.</b><br>
+  Its own name, palette, logo and screens; spoken in English or Spanish, subtitled in the other.
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/jachavarro2004/jhon-studio?style=flat&color=e7bbc8&labelColor=1f1f28" alt="License: Apache-2.0"></a>
+  <a href="https://github.com/jachavarro2004/jhon-studio/releases"><img src="https://img.shields.io/github/v/release/jachavarro2004/jhon-studio?include_prereleases&sort=semver&label=release&style=flat&color=e7bbc8&labelColor=1f1f28" alt="Release"></a>
   <a href="https://github.com/jachavarro2004/jhon-studio/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/jachavarro2004/jhon-studio/ci.yml?branch=main&label=CI&style=flat&color=e7bbc8&labelColor=1f1f28" alt="CI"></a>
   <a href="https://github.com/sponsors/jachavarro2004"><img src="https://img.shields.io/github/sponsors/jachavarro2004?label=Sponsor&logo=githubsponsors&style=flat&color=e7bbc8&labelColor=1f1f28" alt="GitHub Sponsors"></a>
   <a href="https://github.com/jachavarro2004/jhon-studio/stargazers"><img src="https://img.shields.io/github/stars/jachavarro2004/jhon-studio?style=flat&color=e7bbc8&labelColor=1f1f28" alt="Stars"></a>
@@ -27,9 +28,10 @@ It works on its own, in any project folder. It is also an opt-in integration of
 through `/jhon:video` ([With Jhon](#with-jhon)); with it off, Jhon shows and loads nothing
 about video.
 
-Status: the first version is in progress. The whole flow works on any project (a web app, a
-command-line tool, a library): a brief drafted from its own text, a script written from it (by
-you or an agent) and approved, its screens captured, the narration spoken, the MP4s rendered.
+Status: version 0.1.0, the first release ([Releases](#releases)). The whole flow works on any
+project (a web app, a command-line tool, a library): a brief drafted from its own text, a script
+written from it (by you or an agent) and approved, its screens captured, the narration spoken,
+the MP4s rendered.
 
 ## Install
 
@@ -38,14 +40,35 @@ no dependencies), ffmpeg, and for narration and renders Kokoro and the HyperFram
 screens are captured with the chrome-headless-shell HyperFrames keeps (`jhon-studio doctor` says
 what is missing and how to add it; it starts that Chrome for real).
 
+Install the latest release, 0.1.0: download its tarball, check its sha256 and its signature
+(with [cosign](https://docs.sigstore.dev/cosign/system_config/installation/): the release
+workflow of this repository signed it at its tag), unpack it into a folder of its own version and
+link the command onto PATH:
+
 ```sh
-git clone https://github.com/jachavarro2004/jhon-studio ~/.local/share/jhon-studio && ln -s ~/.local/share/jhon-studio/bin/jhon-studio ~/.local/bin/jhon-studio
+V=0.1.0
+R=https://github.com/jachavarro2004/jhon-studio/releases/download/v$V
+T=jhon-studio-$V.tar.gz
+cd "$(mktemp -d)"
+curl -fsSLO "$R/$T" -O "$R/$T.sha256" -O "$R/$T.sigstore.json"
+sha256sum -c "$T.sha256"
+cosign verify-blob --bundle "$T.sigstore.json" \
+  --certificate-identity "https://github.com/jachavarro2004/jhon-studio/.github/workflows/release.yml@refs/tags/v$V" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com "$T"
+mkdir -p ~/.local/share/jhon-studio/$V ~/.local/bin
+tar -xzf "$T" -C ~/.local/share/jhon-studio/$V
+ln -sfn ~/.local/share/jhon-studio/$V/bin/jhon-studio ~/.local/bin/jhon-studio
 jhon-studio doctor
 ```
 
-Any folder on PATH does instead of `~/.local/bin`: the link is followed to the clone, where the
-studio finds its templates, fonts and agent plugin. `jhon-studio --version` prints the version;
-`git -C ~/.local/share/jhon-studio pull` updates it.
+Stop at the first line that fails: `sha256sum -c` and `cosign verify-blob` exit non-zero on a
+tarball that is not the one released (on macOS, `shasum -a 256 -c` instead of `sha256sum -c`).
+Any folder on PATH does instead of `~/.local/bin`: the link is followed to the version's folder,
+where the studio finds its templates, fonts and agent plugin. `jhon-studio --version` prints the
+version. To update, run the same lines with the newer version: it unpacks beside the older one,
+and the link moves to it; linking the older folder again rolls back. (An install from before the
+releases, a clone in `~/.local/share/jhon-studio`: move it away first.) To work on the studio
+itself, use a clone instead ([Development](#development)).
 
 ## With Jhon
 
@@ -65,8 +88,14 @@ the script), your approval (the agent never approves for you), then the MP4s. Jh
 finds the plugin and the skill with `jhon-studio integration --json`:
 
 ```json
-{ "version": "0.1.0", "plugin_dir": "/…/jhon-studio/plugin/claude-code", "skill": "/…/jhon-studio/plugin/claude-code/skills/video/SKILL.md" }
+{ "schema": "jhon-studio.integration/v1", "version": "0.1.0", "requires_jhon": ">=0.5.0-rc.1", "contract": "jhon.integration/v1",
+  "plugin_dir": "/…/jhon-studio/0.1.0/plugin/claude-code", "skill": "/…/jhon-studio/0.1.0/plugin/claude-code/skills/video/SKILL.md" }
 ```
+
+`schema` is this answer's own format; `requires_jhon` the jhon versions the studio runs with (a
+SemVer range); `contract` the integration contract it speaks. A jhon outside the range turns the
+studio off for its run with one note, and works as it does with the studio off
+([Releases](#releases)).
 
 Without Jhon, the plugin works on its own: `claude --plugin-dir ~/.local/share/jhon-studio/plugin/claude-code`.
 
@@ -360,11 +389,58 @@ Renders run the CLI with npx from the home folder (no `package.json` or `node_mo
 project), telemetry and update checks off, `--no-browser-gpu` (WebGL in software: reproducible
 renders) and `--crf 32`.
 
-## Development
+## Releases
+
+Each release is a tag `vX.Y.Z` of this repository, following [Semantic
+Versioning](https://semver.org/); `vX.Y.Z-rc.N` is a pre-release (GitHub never offers it as the
+latest). What changed in each is its section of [CHANGELOG.md](CHANGELOG.md), which is also the
+release's notes. `src/version.ts` is the version's one source: `jhon-studio --version`, `jhon-studio
+integration --json`, the plugin's `plugin.json` and this README follow it (the tests hold them to
+it), and the release workflow refuses a tag that differs from it.
+
+The release workflow (`.github/workflows/release.yml`) runs the tests on the tag, builds
+`jhon-studio-<version>.tar.gz` with `tools/pack.sh` (bin, src, engine, templates, vendor,
+voice, fonts, plugin, LICENSE, README, CHANGELOG; no tests, examples or docs; the same files
+pack to the same bytes), and publishes it with its sha256 (`.sha256`) and a cosign keyless
+signature bundle (`.sigstore.json`): no key is kept anywhere; Sigstore certifies that this
+repository's release workflow, at that tag, signed it through GitHub's OIDC. To check a
+downloaded release by hand (the install above does):
 
 ```sh
+sha256sum -c jhon-studio-<version>.tar.gz.sha256
+cosign verify-blob --bundle jhon-studio-<version>.tar.gz.sigstore.json \
+  --certificate-identity "https://github.com/jachavarro2004/jhon-studio/.github/workflows/release.yml@refs/tags/v<version>" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com jhon-studio-<version>.tar.gz
+```
+
+Compatibility with Jhon: the studio and Jhon release on their own schedules, so each studio
+release says what jhon it runs with in `jhon-studio integration --json`: `requires_jhon`, a
+SemVer range in the syntax jhon reads (`>=`, `>`, `<=`, `<`, `=` on full `x.y.z` versions,
+spaces for AND, `||` for OR), and `contract`, the integration contract it speaks.
+
+| jhon-studio | `requires_jhon` | `contract` |
+| --- | --- | --- |
+| 0.1.0 | `>=0.5.0-rc.1` | `jhon.integration/v1` |
+
+With a jhon outside the range, or one that does not speak the contract, Jhon keeps the studio
+off for that run with one note naming both versions and the fix (update jhon, or install a
+studio release that supports it); the studio's own commands still work without Jhon.
+
+## Development
+
+A clone is the development install: it runs from the working tree, and `git pull` updates it.
+
+```sh
+git clone https://github.com/jachavarro2004/jhon-studio ~/src/jhon-studio && ln -sfn ~/src/jhon-studio/bin/jhon-studio ~/.local/bin/jhon-studio
 node --experimental-strip-types --no-warnings --test test/*.test.ts
 ```
+
+`tools/pack.sh <out-dir>` builds the release tarball and its `.sha256` from the working tree's
+files as git sees them (tracked, or new and not ignored), and `tools/notes.sh <version>` prints a
+version's CHANGELOG section; the release workflow runs both. A release: set the version in
+`src/version.ts` and `plugin/claude-code/.claude-plugin/plugin.json` (and the README's install
+lines and compatibility row, which the tests check), turn the CHANGELOG's changes into the
+version's section, merge, then push the tag `v<version>`.
 
 The tests need no model, GPU or network: compose runs on the sample project with fixture
 narration (`test/fixtures/sample-narration`, each line's seconds), doctor on a fake PATH, web
@@ -381,6 +457,9 @@ drawn by `node test/fixtures/sample-screens.mjs` (ffmpeg).
 | Path | What |
 | --- | --- |
 | `bin/jhon-studio` | the entry |
+| `src/version.ts` | the version, `requires_jhon`, the contract and the release's signer: their one source |
+| `tools/pack.sh`, `tools/notes.sh` | the release tarball and its sha256; a version's release notes |
+| `.github/workflows/release.yml` | a tag's release: tests, tarball, signature, GitHub release |
 | `plugin/claude-code/` | the Claude Code plugin (`jhon-studio`) and its video skill, `/jhon-studio:video`; pi runs the same `SKILL.md` |
 | `src/` | the CLI and its version, settings, brief, script and its reference, capture (ANSI to SVG, Chrome over CDP), narrate, compose, the text-fit check and review, render, make, doctor, the YAML subset |
 | `engine/motion.js` | the motion engine: deterministic timelines HyperFrames seeks frame by frame |

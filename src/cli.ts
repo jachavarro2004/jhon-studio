@@ -18,7 +18,7 @@ import { make } from "./make.ts";
 import { briefFile, reference } from "./reference.ts";
 import { REVIEW_BEFORE_END, checkFit, fitLine, review, timesTable } from "./review.ts";
 import { StudioError, projectDir, resolveVideo, studioDir, videoIds } from "./video.ts";
-import { VERSION } from "./version.ts";
+import { CONTRACT, REQUIRES_JHON, SCHEMA, VERSION } from "./version.ts";
 import { stringifyYaml } from "./yaml.ts";
 
 const VIDEO_FLAGS = `  --project <dir>   the project (default: the current folder)
@@ -48,12 +48,13 @@ for a command's options; \`jhon-studio --version\` prints the version.
 `,
   integration: `Usage: jhon-studio integration [--json]
 
-For Jhon's studio integration (and any agent runtime): the studio's version, its Claude Code
-plugin folder (plugin/claude-code, which holds the video skill, /jhon-studio:video) and the
-skill's SKILL.md, as absolute paths in the studio's real folder (a link to bin/jhon-studio on
-PATH is followed).
+For Jhon's studio integration (and any agent runtime): this answer's schema, the studio's
+version, the jhon versions it runs with (requires_jhon, a SemVer range) and the contract it
+speaks, its Claude Code plugin folder (plugin/claude-code, which holds the video skill,
+/jhon-studio:video) and the skill's SKILL.md, as absolute paths in the studio's real folder (a
+link to bin/jhon-studio on PATH is followed).
 
-  --json   one JSON object: { "version", "plugin_dir", "skill" }
+  --json   one JSON object: { "schema", "version", "requires_jhon", "contract", "plugin_dir", "skill" }
 `,
   init: `Usage: jhon-studio init [--project <dir>]
 
@@ -309,7 +310,7 @@ export async function main(argv: string[], out = process.stdout, err = process.s
       case "integration": {
         // STUDIO is this file's real folder's parent: Node follows a link to bin/jhon-studio.
         const plugin = realpathSync(join(STUDIO, "plugin", "claude-code"));
-        const info = { version: VERSION, plugin_dir: plugin, skill: join(plugin, "skills", "video", "SKILL.md") };
+        const info = { schema: SCHEMA, version: VERSION, requires_jhon: REQUIRES_JHON, contract: CONTRACT, plugin_dir: plugin, skill: join(plugin, "skills", "video", "SKILL.md") };
         if (!existsSync(info.skill)) throw new StudioError(`${info.skill} is missing: the studio's folder is incomplete`);
         out.write(flags.json ? JSON.stringify(info, null, 2) + "\n" : Object.entries(info).map(([k, v]) => `${k} ${v}`).join("\n") + "\n");
         return 0;
