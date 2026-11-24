@@ -17,9 +17,9 @@ Before you ask, `jhon-studio doctor` checks node, ffmpeg, Kokoro, the
 HyperFrames CLI and Chrome and says how to fix what fails, and every command
 has `--help`.
 
-## Support Jhon
+## Support jhon-studio
 
-Jhon is free and open source.
+jhon-studio is free and open source.
 If it helps you, donate any amount you choose,
 once or monthly, on GitHub Sponsors.
 If you can't donate, a ⭐ on the repo helps
