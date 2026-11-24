@@ -1,0 +1,20 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --version
+      # No models, no GPU, no render: compose runs on fixture narration, doctor on a fake PATH.
+      - run: node --experimental-strip-types --no-warnings --test test/*.test.ts

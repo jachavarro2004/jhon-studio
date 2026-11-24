@@ -1,0 +1,9 @@
+odd/
+node_modules/
+# A project's studio output (.jhon/studio/<video>/): generated, never committed here; the
+# sample project's script.json is its source and stays.
+**/.jhon/studio/*/*
+!**/.jhon/studio/*/script.json
+# The HyperFrames CLI's state and renders.
+.hyperframes/
+renders/

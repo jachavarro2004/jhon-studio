@@ -1,0 +1,126 @@
+      /* The presentation's styles (inlined into index.html by src/compose.ts, after the project's
+         palette as CSS variables: --page --ink --soft --faint --line --accent --accent-fill
+         --accent-ink --frame --frame-soft --space --stage --card --wall). Square, flat, a hard
+         offset shadow, mono kickers in spaced capitals; one motion style, "ink and stamp". */
+      @font-face { font-family: "Fraunces"; src: url("assets/fonts/fraunces.woff") format("woff"); font-weight: 100 900; font-style: normal; }
+      @font-face { font-family: "Fraunces"; src: url("assets/fonts/fraunces-italic.woff") format("woff"); font-weight: 100 900; font-style: italic; }
+      @font-face { font-family: "Space Grotesk"; src: url("assets/fonts/space-grotesk-regular.woff") format("woff"); font-weight: 400; }
+      @font-face { font-family: "Space Grotesk"; src: url("assets/fonts/space-grotesk-medium.woff") format("woff"); font-weight: 500; }
+      @font-face { font-family: "FiraCode Nerd Font Mono"; src: url("assets/fonts/firacode-medium.woff") format("woff"); font-weight: 500; }
+
+      html, body { margin: 0; background: var(--space); }
+      #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--space); }
+      #stage { position: absolute; inset: 0; width: 1920px; height: 1080px; display: block; z-index: 0; }
+
+      .kick { font-family: "FiraCode Nerd Font Mono"; font-weight: 500; letter-spacing: 0.28em; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+      em { font-style: italic; color: var(--accent); }
+      .code { font-family: "FiraCode Nerd Font Mono"; font-weight: 500; font-style: normal; color: var(--accent); font-size: 0.82em; letter-spacing: -0.01em; }
+      .mask { overflow: hidden; }
+
+      /* ---- The mark: the project's glyph (a letter in the display serif; other scripts from the system's fonts) or its logo, on a square */
+      .mark-face { box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: var(--accent-fill); color: var(--accent-ink); box-shadow: inset 0 0 0 2px var(--accent); font-family: "Fraunces", "Noto Sans CJK JP", "Noto Sans", sans-serif; font-weight: 600; font-style: normal; line-height: 1; letter-spacing: 0; text-transform: none; font-variation-settings: "opsz" 144; }
+      .mark-face.logo { background: var(--card); }
+      .mark-logo { display: block; width: 74%; height: 74%; object-fit: contain; }
+
+      /* ---- The intro (flat, the default): the mark stamps down, the name inks beside it */
+      #s1 { position: absolute; inset: 0; z-index: 2; }
+      #s1.intro-flat { background: var(--stage); overflow: hidden; }
+      .intro-pool {
+        position: absolute; left: -260px; top: -300px; width: 1640px; height: 1680px;
+        background:
+          radial-gradient(ellipse 26% 26% at 50% 50%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 100%),
+          radial-gradient(ellipse 44% 44% at 50% 50%, color-mix(in srgb, var(--accent-fill) 92%, transparent), transparent 100%);
+      }
+      #s1.intro-flat #s1-cam { position: absolute; inset: 0; transform-origin: 540px 540px; }
+      .intro-mark { position: absolute; left: 300px; top: 330px; width: 420px; height: 420px; }
+      .intro-mark-shadow { position: absolute; left: 18px; top: 18px; width: 100%; height: 100%; background: #000; }
+      .intro-mark-face { position: absolute; inset: 0; font-size: 290px; box-shadow: inset 0 0 0 4px var(--accent); }
+      .intro-ring { position: absolute; inset: -4px; box-sizing: border-box; border: 6px solid var(--accent); }
+      .intro-text { position: absolute; left: 840px; top: 0; width: 960px; height: 1080px; display: flex; flex-direction: column; justify-content: center; }
+      .intro-flat .tag { white-space: normal; max-width: 960px; }
+
+      /* ---- The intro (`intro: seal`): the wordmark beside the 3D seal (stage.js) */
+      #s1.intro-seal #s1-cam { position: absolute; left: 930px; top: 0; width: 820px; height: 1080px; display: flex; flex-direction: column; justify-content: center; transform-origin: -380px 540px; }
+      #s1-kick { font-size: 28px; margin-left: 10px; }
+      #s1-name { display: block; font-family: "Fraunces"; font-weight: 500; font-size: 300px; line-height: 0.92; letter-spacing: -0.03em; color: var(--ink); font-variation-settings: "opsz" 144, "SOFT" 20; padding: 18px 30px 30px 0; margin-top: 6px; white-space: nowrap; }
+      #s1-name em { font-weight: 600; }
+      .tag { display: block; font-family: "Fraunces"; font-weight: 300; font-size: 54px; line-height: 1.14; letter-spacing: -0.005em; font-variation-settings: "opsz" 72; padding: 2px 0 8px 8px; white-space: nowrap; }
+      .tag em { font-weight: 500; }
+      #s1-tag1 { color: var(--ink); }
+      #s1-tag2 { color: var(--soft); }
+
+      /* ---- The stage: dark, under a light pool in the accent that drifts with the current */
+      #bg { position: absolute; inset: 0; z-index: 4; }
+      .stagebg { position: absolute; inset: 0; background: var(--stage); overflow: hidden; }
+      .pool {
+        position: absolute; left: -240px; top: -260px; width: 2400px; height: 1500px;
+        background:
+          radial-gradient(ellipse 30% 34% at 50% 50%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 100%),
+          radial-gradient(ellipse 46% 48% at 50% 50%, color-mix(in srgb, var(--accent-fill) 95%, transparent), transparent 100%);
+      }
+      .shot { position: absolute; inset: 0; z-index: 5; }
+      .rv { position: absolute; inset: 0; }
+      .cam { position: absolute; inset: 0; transform-origin: 960px 540px; }
+      .w { display: inline-block; }
+      .w.em { font-style: italic; color: var(--accent); font-weight: 600; }
+
+      /* ---- Head: the chapter's headline */
+      .head-text { position: absolute; left: 200px; top: 290px; width: 1560px; }
+      .head-text .kick { font-size: 30px; }
+      .head-lead { margin-top: 44px; font-family: "Space Grotesk"; font-weight: 400; font-size: 50px; color: var(--soft); }
+      .hl { display: block; font-family: "Fraunces"; font-weight: 500; font-size: 116px; line-height: 1.08; letter-spacing: -0.008em; font-variation-settings: "opsz" 144; white-space: nowrap; padding: 0 0 6px; color: var(--ink); }
+      .hl:first-of-type { margin-top: 18px; }
+      .hl2 { color: var(--accent); font-style: italic; font-weight: 600; }
+
+      /* ---- Cards: one claim, big type, an accent edge */
+      .card-pos { position: absolute; inset: 0 0 90px 0; display: flex; align-items: center; justify-content: center; }
+      .card { position: relative; width: 1460px; }
+      .card-shadow { position: absolute; left: 14px; top: 14px; width: 100%; height: 100%; background: #000; }
+      .card-face { position: relative; background: var(--card); box-shadow: inset 0 0 0 1px var(--frame-soft), inset 10px 0 0 var(--accent); padding: 70px 96px 76px 112px; box-sizing: border-box; }
+      .card-kick { font-size: 30px; display: flex; align-items: center; gap: 22px; }
+      .kick-mark { display: flex; flex: none; width: 46px; height: 46px; font-size: 30px; box-shadow: inset 0 0 0 2px var(--accent), 3px 3px 0 #000; }
+      .kick-mark.logo { background: var(--accent-fill); }
+      .card-title { margin-top: 48px; font-family: "Fraunces"; font-weight: 500; line-height: 1.06; letter-spacing: -0.008em; color: var(--ink); font-variation-settings: "opsz" 144; white-space: nowrap; }
+      .card-body { margin-top: 40px; font-family: "Space Grotesk"; font-weight: 400; font-size: 48px; line-height: 1.3; color: var(--soft); }
+      .ink-line { display: block; white-space: nowrap; }
+      .list { margin-top: 44px; display: grid; grid-template-columns: max-content; row-gap: 22px; }
+      .lrow { display: flex; align-items: baseline; gap: 34px; white-space: nowrap; }
+      .lk { font-family: "Fraunces"; font-weight: 500; font-size: 78px; color: var(--ink); min-width: 520px; font-variation-settings: "opsz" 144; }
+      .la { font-family: "Space Grotesk"; font-size: 54px; color: var(--accent); }
+      .lv { font-family: "Fraunces"; font-weight: 400; font-size: 66px; color: var(--soft); font-variation-settings: "opsz" 72; }
+      .figs { margin-top: 40px; display: flex; gap: 120px; }
+      .fig-n { font-family: "Fraunces"; font-weight: 600; font-style: italic; font-size: 200px; line-height: 1; color: var(--accent); font-variation-settings: "opsz" 144; white-space: nowrap; }
+      .fig-l { margin-top: 18px; font-family: "Space Grotesk"; font-size: 40px; line-height: 1.25; color: var(--soft); max-width: 560px; }
+
+      /* ---- Proof screens: close, large, square-on, held, lit in the accent */
+      .lit { position: absolute; left: 160px; top: 40px; width: 1600px; height: 860px; background: radial-gradient(ellipse 60% 62% at 50% 50%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 100%); }
+      .screen { position: absolute; overflow: hidden; background: var(--page); box-shadow: 16px 16px 0 #000, 0 0 0 1px var(--frame-soft); }
+      .screen.diagram { background: var(--frame); }
+      .sheet { position: absolute; inset: 0; }
+      .sheet img { position: absolute; display: block; }
+      .mark { position: absolute; box-sizing: border-box; border: 4px solid var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); box-shadow: 5px 5px 0 #000; }
+
+      /* ---- The close: the mark again and the project's line */
+      .close-text { position: absolute; left: 200px; top: 250px; width: 1560px; }
+      .close-seal { position: relative; width: 168px; height: 168px; }
+      .seal-shadow { position: absolute; left: 9px; top: 9px; width: 100%; height: 100%; background: #000; }
+      .seal-face { position: absolute; inset: 0; font-size: 112px; }
+      .pitch { display: block; font-family: "Fraunces"; font-weight: 500; font-size: 112px; line-height: 1.1; letter-spacing: -0.008em; font-variation-settings: "opsz" 144; white-space: nowrap; padding: 0 20px 10px 0; color: var(--ink); }
+      .close-text .mask:first-of-type .pitch { margin-top: 56px; }
+      .pitch2 { color: var(--soft); }
+      .pitch2 em { font-weight: 600; }
+      .close-url { margin-top: 54px; font-size: 30px; color: var(--faint); letter-spacing: 0.16em; text-transform: none; }
+      .close-install { font-size: 26px; letter-spacing: 0; color: var(--ink); margin-bottom: 18px; }
+
+      /* ---- The seam band: scenes change under a flat band in the accent that sweeps across */
+      .band { position: absolute; inset: 0; z-index: 8; pointer-events: none; }
+      .band-in { position: absolute; top: 0; left: 0; width: 1100px; height: 1080px; background: var(--accent-fill); box-shadow: inset 22px 0 0 var(--accent), inset 30px 0 0 var(--accent-ink); }
+
+      /* ---- Film: vignette and grain, over every shot */
+      #vig { position: absolute; inset: 0; z-index: 9; pointer-events: none; background: radial-gradient(ellipse 80% 78% at 50% 48%, rgba(0, 0, 0, 0) 60%, rgba(0, 0, 0, 0.5) 100%); }
+      #grain { position: absolute; inset: 0; width: 1920px; height: 1080px; z-index: 9; pointer-events: none; mix-blend-mode: overlay; opacity: 0.3; }
+
+      /* ---- Subtitles: a band under the proof screens' frame (they end above y 857), never over them */
+      #captions { position: absolute; left: 0; right: 0; bottom: 0; height: 200px; z-index: 10; }
+      .cap { position: absolute; left: 0; right: 0; bottom: 52px; display: flex; justify-content: center; }
+      .cap-text { display: block; max-width: 1560px; text-align: center; font-family: "Space Grotesk"; font-weight: 500; font-size: 36px; line-height: 1.3; color: var(--ink); text-shadow: 0 2px 14px rgba(0, 0, 0, 0.95), 0 0 2px rgba(0, 0, 0, 0.95); }

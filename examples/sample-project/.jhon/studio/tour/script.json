@@ -1,0 +1,61 @@
+{
+  "approved": false,
+  "say": { "30%": "thirty percent" },
+  "shots": [
+    {
+      "id": "intro", "kind": "intro",
+      "en": "Larder. Cook from what you already have.",
+      "es": "Larder. Cocina con lo que ya tienes."
+    },
+    {
+      "id": "problem", "kind": "head", "chapter": "The problem",
+      "lead": "Every week, the same question:",
+      "lines": [["what is *for dinner,*", "what is for dinner"], ["and what is about to spoil?", "and what is about"]],
+      "en": "Every week, the same question: what is for dinner, and what is about to spoil?",
+      "es": "Cada semana, la misma pregunta: ¿qué hay de cena y qué está por echarse a perder?"
+    },
+    {
+      "id": "stock", "kind": "card", "kicker": "Your pantry",
+      "title": ["It starts with *what you have.*"],
+      "body": [["Every item, with its amount.", "every item"]],
+      "en": "Larder starts with what you have: every item, with its amount.",
+      "es": "Larder empieza con lo que tienes: cada producto, con su cantidad."
+    },
+    {
+      "id": "pantry", "kind": "proof", "src": "pantry.png",
+      "marks": [
+        { "at": "what is in stock", "r": [48, 136, 920, 716] },
+        { "at": "use soon", "r": [1008, 136, 544, 420] }
+      ],
+      "en": "Larder keeps the list: what is in stock, and what to use soon.",
+      "es": "Larder lleva la lista: lo que hay y lo que conviene usar pronto."
+    },
+    {
+      "id": "plan", "kind": "list", "chapter": "Your week", "kicker": "Your week",
+      "rows": [["Plan", "seven dinners", "plans seven"], ["Shop", "only what is missing", "a list"]],
+      "en": "It plans seven dinners, and writes a list of only what is missing.",
+      "es": "Planea siete cenas y escribe una lista solo con lo que falta."
+    },
+    {
+      "id": "week", "kind": "proof", "src": "week.png",
+      "marks": [
+        { "at": 0, "r": [48, 136, 1528, 484] },
+        { "at": "Tuesday", "r": [268, 136, 208, 484] },
+        { "at": "the shopping list", "r": [48, 660, 1528, 190] }
+      ],
+      "en": "The spinach goes into Tuesday, before it spoils, and the shopping list stays short.",
+      "es": "La espinaca va al martes, antes de que se dañe, y la lista de compras queda corta."
+    },
+    {
+      "id": "month", "kind": "numbers", "kicker": "One month",
+      "figures": [["30%", "less food thrown away", "30% less"], ["1", "shopping trip a week", "one shopping trip"]],
+      "en": "In a month of testing, a family threw away 30% less food, with one shopping trip a week.",
+      "es": "En un mes de prueba, una familia tiró un 30 % menos de comida, con una sola compra por semana."
+    },
+    {
+      "id": "close", "kind": "close", "install": "brew install larder",
+      "en": "Larder. Cook from what you already have.",
+      "es": "Larder. Cocina con lo que ya tienes."
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+# Larder's studio settings (a fictional project; see its README).
+name: Larder
+tagline: Cook from what you already have.
+url: https://example.com/larder
+palette:
+  accent: "#7fd1b9"
+  accent_fill: "#1f4a40"
+  ink: "#eef4f1"
+  page: "#141a19"
+mark:
+  path: assets/logo.svg
+voice: af_heart
+languages: [en, es]
+screens: screens

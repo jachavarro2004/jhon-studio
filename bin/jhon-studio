@@ -1,0 +1,16 @@
+#!/usr/bin/env -S node --experimental-strip-types --no-warnings=ExperimentalWarning
+// jhon-studio: the command line. Node 22 or newer runs src/ as TypeScript with its type
+// stripping; there is no build step and no dependency. Put this file (or a link to it) on PATH.
+"use strict";
+const { join } = require("node:path");
+const { pathToFileURL } = require("node:url");
+
+const [major] = process.versions.node.split(".").map(Number);
+if (major < 22) {
+  process.stderr.write(`jhon-studio: needs Node 22 or newer (this is ${process.version})\n`);
+  process.exit(1);
+}
+import(pathToFileURL(join(__dirname, "..", "src", "cli.ts")).href)
+  .then(({ main }) => main(process.argv.slice(2)))
+  .then((code) => { process.exitCode = code; })
+  .catch((e) => { process.stderr.write(`jhon-studio: ${e && e.stack ? e.stack : e}\n`); process.exitCode = 1; });
