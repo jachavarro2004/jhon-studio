@@ -1,0 +1,16 @@
+name: Feature request
+description: A change to what jhon-studio does. The owner decides what is taken.
+labels: [enhancement, triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem it solves
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+    validations:
+      required: true

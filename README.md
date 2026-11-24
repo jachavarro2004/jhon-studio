@@ -1,4 +1,20 @@
-# jhon-studio
+<p align="center">
+  <img src="docs/assets/brand/jhon-banner.gif" alt="Jhon" width="760">
+</p>
+
+<h1 align="center">jhon-studio — presentation videos for any project</h1>
+
+<p align="center">
+  <b>Let the agent run. Deliver only what is proven.</b><br>
+  An agent framework for Claude Code and pi.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/jachavarro2004/jhon-studio?style=flat&color=e7bbc8&labelColor=1f1f28" alt="License: Apache-2.0"></a>
+  <a href="https://github.com/jachavarro2004/jhon-studio/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/jachavarro2004/jhon-studio/ci.yml?branch=main&label=CI&style=flat&color=e7bbc8&labelColor=1f1f28" alt="CI"></a>
+  <a href="https://github.com/sponsors/jachavarro2004"><img src="https://img.shields.io/github/sponsors/jachavarro2004?label=Sponsor&logo=githubsponsors&style=flat&color=e7bbc8&labelColor=1f1f28" alt="GitHub Sponsors"></a>
+  <a href="https://github.com/jachavarro2004/jhon-studio/stargazers"><img src="https://img.shields.io/github/stars/jachavarro2004/jhon-studio?style=flat&color=e7bbc8&labelColor=1f1f28" alt="Stars"></a>
+</p>
 
 Narrated presentation videos for any project, made by code: the project's own name, palette,
 logo and screens; a flat animated intro; real screens held close as proof (images, command
@@ -297,9 +313,32 @@ drawn by `node test/fixtures/sample-screens.mjs` (ffmpeg).
 | `voice/kokoro.py` | speaks lines with Kokoro (run by narrate in the Kokoro venv) |
 | `fonts/`, `vendor/three-0.187.0/` | bundled third parties |
 
-## Licences
+Contributions: [CONTRIBUTING.md](CONTRIBUTING.md); questions and help: [SUPPORT.md](SUPPORT.md);
+security problems, privately: [SECURITY.md](SECURITY.md).
+
+## The Jhon family
+
+- **[jhon-agent](https://github.com/jachavarro2004/jhon-agent)**: the framework.
+- **jhon-studio**: presentation videos for any project (you are here).
+- **[The landing](https://jachavarro2004.github.io/jhon-site/)**: Jhon's site, jachavarro2004.github.io/jhon-site.
+- **[The profile](https://github.com/jachavarro2004)**: the author's GitHub profile, github.com/jachavarro2004.
+- **YouTube**: Jhon's films, a video for every release.
+
+## Support Jhon
+
+Jhon is free and open source.
+If it helps you, donate any amount you choose,
+once or monthly, on GitHub Sponsors.
+If you can't donate, a ⭐ on the repo helps
+keep the project maintained.
+
+[♥ Sponsor on GitHub](https://github.com/sponsors/jachavarro2004)
+
+## License
 
 jhon-studio is licensed under the Apache License 2.0 ([LICENSE](LICENSE)).
+
+### Third-party licences
 
 Bundled:
 
