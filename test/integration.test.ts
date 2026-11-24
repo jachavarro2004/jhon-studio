@@ -1,8 +1,9 @@
 /**
  * The Jhon integration, studio side: `jhon-studio integration --json` tells Jhon where the Claude
  * Code plugin and the video skill live (resolved from the real location of bin/jhon-studio, so a
- * link on PATH works), `--version` prints the version, and the plugin's manifest and skill agree
- * with it. The skill is generic: it names no private project.
+ * link on PATH works) and what jhon it needs (requires_jhon, contract; src/version.ts is their one
+ * source), `--version` prints the version, and the plugin's manifest and skill agree with it. The
+ * skill is generic: it names no private project.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -10,6 +11,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { BIN, ROOT, cli, privateWords, scratch } from "./helpers.ts";
+import { CONTRACT, REQUIRES_JHON, SCHEMA, VERSION as STUDIO_VERSION } from "../src/version.ts";
 
 const PLUGIN = join(ROOT, "plugin", "claude-code");
 const SKILL = join(PLUGIN, "skills", "video", "SKILL.md");
@@ -24,19 +26,60 @@ test("--version prints the version alone, the plugin's version", () => {
   const v = r.stdout.trim();
   assert.match(v, VERSION);
   assert.equal(manifest().version, v, "plugin.json carries the same version");
+  assert.equal(v, STUDIO_VERSION, "src/version.ts is the version's one source");
 });
 
-test("integration --json: the version, the plugin folder and the skill, absolute; exit 0", () => {
+test("plugin.json's version is src/version.ts's VERSION", () => {
+  assert.equal(manifest().version, STUDIO_VERSION);
+});
+
+test("integration --json: its schema, the version, the jhon it needs, the plugin folder and the skill, absolute; exit 0", () => {
   const r = cli(["integration", "--json"]);
   assert.equal(r.code, 0, r.stderr);
   assert.equal(r.stderr, "");
   const root = realpathSync(ROOT);
   assert.deepEqual(JSON.parse(r.stdout), {
+    schema: "jhon-studio.integration/v1",
     version: cli(["--version"]).stdout.trim(),
+    requires_jhon: ">=0.5.0-rc.1",
+    contract: "jhon.integration/v1",
     plugin_dir: join(root, "plugin", "claude-code"),
     skill: join(root, "plugin", "claude-code", "skills", "video", "SKILL.md"),
   });
-  assert.deepEqual(Object.keys(JSON.parse(r.stdout)), ["version", "plugin_dir", "skill"], "in that order");
+  assert.deepEqual(Object.keys(JSON.parse(r.stdout)), ["schema", "version", "requires_jhon", "contract", "plugin_dir", "skill"], "in that order");
+});
+
+test("the jhon it needs: SCHEMA, CONTRACT and REQUIRES_JHON are the values integration --json gives (one source)", () => {
+  assert.equal(SCHEMA, "jhon-studio.integration/v1");
+  assert.equal(CONTRACT, "jhon.integration/v1");
+  assert.equal(REQUIRES_JHON, ">=0.5.0-rc.1");
+  const j = JSON.parse(cli(["integration", "--json"]).stdout);
+  assert.deepEqual([j.schema, j.requires_jhon, j.contract], [SCHEMA, REQUIRES_JHON, CONTRACT]);
+});
+
+/**
+ * The range syntax jhon reads (its integrations/README.md, "The jhon a tool needs"): comparators
+ * >=, >, <=, <, = (or none) on full MAJOR.MINOR.PATCH versions with an optional pre-release and
+ * build; spaces AND, `||` OR. No ^, ~, x or partial versions.
+ */
+function jhonReads(range: string): boolean {
+  const comparator = /^(>=|<=|>|<|=)?\s*v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/;
+  return range.split("||").every((alt) => {
+    const words = alt.trim().split(/\s+/).filter(Boolean);
+    const set: string[] = [];
+    for (let i = 0; i < words.length; i++) {
+      let w = words[i]!;
+      if (/^(>=|<=|>|<|=)$/.test(w) && i + 1 < words.length) w += words[++i];
+      set.push(w);
+    }
+    return set.length > 0 && set.every((w) => comparator.test(w));
+  });
+}
+
+test("REQUIRES_JHON is a range jhon can read", () => {
+  for (const ok of [">=0.5.0-rc.1", ">=0.5.0 <0.7.0", "=0.5.0 || >=0.6.0", "0.5.0"]) assert.ok(jhonReads(ok), ok);
+  for (const no of ["^0.5.0", "~0.5.0", ">=0.5", "0.5.x", "", ">= "]) assert.ok(!jhonReads(no), no);
+  assert.ok(jhonReads(REQUIRES_JHON), REQUIRES_JHON);
 });
 
 test("integration --json through a link to bin/jhon-studio on PATH: the paths are the repository's, not the link's", (t) => {
@@ -54,11 +97,17 @@ test("integration --json through a link to bin/jhon-studio on PATH: the paths ar
   assert.ok(existsSync(j.skill), "the skill is there");
 });
 
-test("integration without --json: the same three, a line each, for a person", () => {
+test("integration without --json: the same fields, a line each, for a person", () => {
   const r = cli(["integration"]);
   assert.equal(r.code, 0, r.stderr);
   const j = JSON.parse(cli(["integration", "--json"]).stdout);
-  assert.equal(r.stdout, `version ${j.version}\nplugin_dir ${j.plugin_dir}\nskill ${j.skill}\n`);
+  assert.equal(r.stdout, `schema ${j.schema}\nversion ${j.version}\nrequires_jhon ${j.requires_jhon}\ncontract ${j.contract}\nplugin_dir ${j.plugin_dir}\nskill ${j.skill}\n`);
+});
+
+test("integration --help names the fields", () => {
+  const r = cli(["integration", "--help"]);
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /\{ "schema", "version", "requires_jhon", "contract", "plugin_dir", "skill" \}/);
 });
 
 test("integration takes no other option, and --version no command", () => {
