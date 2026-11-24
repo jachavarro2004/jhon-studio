@@ -81,7 +81,8 @@ test("the script's frame: shot ids unique and plain, the intro first and the clo
   assert.match(validateScript(x, both).join("\n"), new RegExp(`${card2.id}: body 0: "a phrase not said" is not in its line`));
   assert.match(validateScript({ shots: [] }, both).join("\n"), /no shots/);
   assert.match(validateScript({ approved: "yes", shots: sample().shots }, both).join("\n"), /approved: false, or \{ "sha256": \.\.\. \} as `jhon-studio video script --approve` writes it/);
-  assert.match(validateScript({ approved: true, shots: sample().shots }, both).join("\n"), /approved: false, or \{ "sha256"/, "a bare true approves nothing in particular");
+  assert.deepEqual(validateScript({ approved: true, shots: sample().shots }, both), [], "a legacy bare true is valid");
+  assert.equal(approval({ approved: true, shots: sample().shots }), "legacy", "but it approves nothing in particular");
   assert.deepEqual(validateScript({ approved: { sha256: "a".repeat(64) }, shots: sample().shots }, both), []);
 });
 

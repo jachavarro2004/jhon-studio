@@ -11,8 +11,7 @@ import { createServer } from "node:http";
 import { join } from "node:path";
 import { inflateSync } from "node:zlib";
 import { parseAnsiLine } from "../src/ansi.ts";
-import { chromePath } from "../src/config.ts";
-import { SAMPLE_VIDEO, cli, cliAsync, sampleCopy } from "./helpers.ts";
+import { HOST_CHROME, SAMPLE_VIDEO, cli, cliAsync, sampleCopy } from "./helpers.ts";
 
 /** The sample with its studio.yaml's screens replaced by a list. */
 function withScreens(t: { after: (fn: () => void) => void }, list: string) {
@@ -127,7 +126,7 @@ test("parseAnsiLine: SGR styles in runs; other escapes dropped; wide glyphs take
   assert.equal(parseAnsiLine("\x1b[38;5;196mx\x1b[48;2;1;2;3my")[1]!.style.bg, "#010203");
 });
 
-const CHROME = chromePath();
+const CHROME = HOST_CHROME;
 const NO_CHROME = !CHROME || !existsSync(CHROME) ? "no chrome-headless-shell: set JHON_STUDIO_CHROME or run npx --yes hyperframes@0.9.58 browser ensure" : false;
 
 test("a web screen: the page loaded, its steps run (fill, click, wait, scroll, goto), then captured at its viewport", { skip: NO_CHROME }, async (t) => {

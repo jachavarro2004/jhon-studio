@@ -23,6 +23,7 @@ export interface RenderJob { lang: string; out: string; args: string[]; env: Rec
 export function needApproval(video: Video, script: Script): void {
   const a = approval(script);
   if (a === "changed") throw new StudioError("the script changed after its approval: run jhon-studio video script --approve");
+  if (a === "legacy") throw new StudioError("this script's approval predates its hash: run jhon-studio video script --approve");
   if (a !== "approved") throw new StudioError(`the script is not approved: read ${video.script}, then run \`jhon-studio video script --approve --project ${video.project} --video ${video.id}\``);
 }
 

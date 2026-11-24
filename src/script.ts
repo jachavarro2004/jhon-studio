@@ -2,6 +2,7 @@
  * src/script.ts — a video's script: script.json in its folder (.jhon/studio/<video>/).
  *
  *   { "approved": false,                  `jhon-studio video script --approve` sets { "sha256": ... }
+ *                                         (a legacy `true` reads as not approved: it predates the hash)
  *     "say": { "CLI": "C L I" },          how words are spoken (whole words; backticks are always dropped)
  *     "timing": { "TAIL": 0.55 },         optional: TAIL, PROOF_TAIL, PROOF_MIN, CLOSE_TAIL in seconds
  *     "shots": [ ... ] }
@@ -40,7 +41,7 @@ export interface Shot {
   src?: string; crop?: [number, number, number, number]; marks?: Mark[]; pan?: { by: number; at: Phrase };
   install?: string;
 }
-export interface Script { approved?: false | { sha256: string }; say?: Record<string, string>; timing?: Record<string, number>; shots: Shot[] }
+export interface Script { approved?: boolean | { sha256: string }; say?: Record<string, string>; timing?: Record<string, number>; shots: Shot[] }
 
 /** Ids the composition itself uses. */
 const RESERVED = new Set(["s1", "bg", "bg-in", "pool", "stage", "grain", "vig", "captions", "root"]);
@@ -80,9 +81,14 @@ export function scriptHash(script: Script): string {
   return createHash("sha256").update(JSON.stringify(rest)).digest("hex");
 }
 
-/** Whether the script is approved as it is now, changed after its approval, or never approved. */
-export function approval(script: Script): "approved" | "changed" | "none" {
+/**
+ * Whether the script is approved as it is now, changed after its approval, never approved, or
+ * approved the old way (`approved: true`, before approvals were the script's hash: not an
+ * approval of the script as it is now).
+ */
+export function approval(script: Script): "approved" | "changed" | "none" | "legacy" {
   const a = script.approved;
+  if (a === true) return "legacy";
   if (!a || typeof a !== "object" || typeof a.sha256 !== "string") return "none";
   return a.sha256 === scriptHash(script) ? "approved" : "changed";
 }
@@ -111,8 +117,8 @@ export function validateScript(script: unknown, opts: { languages: string[]; nar
   if (!script || typeof script !== "object" || Array.isArray(script)) return ["the script is a JSON object with its shots"];
   const sc = script as Script;
   const voice = opts.narration ?? "en";
-  if ("approved" in sc && sc.approved !== false && !(sc.approved && typeof sc.approved === "object" && Object.keys(sc.approved).length === 1 && typeof sc.approved.sha256 === "string" && /^[0-9a-f]{64}$/.test(sc.approved.sha256)))
-    errs.push('approved: false, or { "sha256": ... } as `jhon-studio video script --approve` writes it');
+  if ("approved" in sc && typeof sc.approved !== "boolean" && !(sc.approved && typeof sc.approved === "object" && Object.keys(sc.approved).length === 1 && typeof sc.approved.sha256 === "string" && /^[0-9a-f]{64}$/.test(sc.approved.sha256)))
+    errs.push('approved: false, or { "sha256": ... } as `jhon-studio video script --approve` writes it (a legacy true reads as not approved)');
   if ("say" in sc && (!sc.say || typeof sc.say !== "object" || Array.isArray(sc.say) || Object.values(sc.say).some((v) => typeof v !== "string")))
     errs.push("say: a map of written words to how they are spoken");
   if ("timing" in sc && (!sc.timing || typeof sc.timing !== "object" || Object.entries(sc.timing).some(([k, v]) => !["TAIL", "PROOF_TAIL", "PROOF_MIN", "CLOSE_TAIL"].includes(k) || !isNum(v) || v < 0)))

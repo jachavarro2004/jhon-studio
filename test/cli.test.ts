@@ -13,7 +13,7 @@ import { KINDS, lines, validateScript } from "../src/script.ts";
 import { parseYaml } from "../src/yaml.ts";
 import { SAMPLE_VIDEO, cli, sampleCopy, scratch } from "./helpers.ts";
 
-const COMMANDS = [[], ["init"], ["doctor"], ["video"], ["video", "narrate"], ["video", "compose"], ["video", "render"], ["video", "script"], ["video", "brief"], ["video", "capture"], ["video", "make"]];
+const COMMANDS = [[], ["init"], ["doctor"], ["video"], ["video", "narrate"], ["video", "compose"], ["video", "render"], ["video", "script"], ["video", "brief"], ["video", "capture"], ["video", "make"], ["integration"]];
 
 test("--help for every command: its usage on stdout, exit 0", () => {
   for (const c of COMMANDS) {
@@ -25,7 +25,7 @@ test("--help for every command: its usage on stdout, exit 0", () => {
     }
   }
   const top = cli(["--help"]).stdout;
-  for (const c of ["init", "video brief", "video script", "video capture", "video narrate", "video compose", "video render", "video make", "doctor"]) assert.ok(top.includes(c), `the top help names ${c}`);
+  for (const c of ["init", "video brief", "video script", "video capture", "video narrate", "video compose", "video render", "video make", "doctor", "integration", "--version"]) assert.ok(top.includes(c), `the top help names ${c}`);
 });
 
 test("an unknown command or flag is a usage error: exit 2, the usage on stderr", () => {
@@ -226,4 +226,30 @@ test("--video may be left out when the project has one video; with none or sever
   const n = cli(["video", "compose", "--project", empty]);
   assert.equal(n.code, 1);
   assert.match(n.stderr, /no video in .*\.jhon\/studio/);
+});
+
+test("a legacy `approved: true` is valid but not an approval: render and make say to approve it again, and --approve stores the hash", (t) => {
+  const { project, video } = sampleCopy(t);
+  const at = ["--project", project, "--video", SAMPLE_VIDEO];
+  const file = join(video, "script.json");
+  const legacy = readFileSync(file, "utf8").replace('"approved": false', '"approved": true');
+  writeFileSync(file, legacy);
+  const check = cli(["video", "script", "--check", ...at]);
+  assert.equal(check.code, 0, check.stderr);
+  assert.equal(check.stdout, `ok ${file} (8 shots)\n`);
+  assert.equal(cli(["video", "compose", ...at]).code, 0);
+  const r = cli(["video", "render", ...at, "--dry-run"]);
+  assert.equal(r.code, 1);
+  assert.equal(r.stdout, "");
+  assert.equal(r.stderr, "jhon-studio: this script's approval predates its hash: run jhon-studio video script --approve\n");
+  const m = cli(["video", "make", ...at, "--dry-run"]);
+  assert.equal(m.code, 3);
+  assert.equal(m.stderr, "jhon-studio: video make stopped before the render: this script's approval predates its hash: run jhon-studio video script --approve\n");
+  assert.equal(readFileSync(file, "utf8"), legacy, "nothing approves it on its own");
+  assert.ok(!existsSync(join(video, "renders")));
+
+  const a = cli(["video", "script", "--approve", ...at]);
+  assert.equal(a.code, 0, a.stderr);
+  assert.match(JSON.parse(readFileSync(file, "utf8")).approved.sha256, /^[0-9a-f]{64}$/);
+  assert.equal(cli(["video", "render", ...at, "--dry-run"]).code, 0, "approved by its hash now");
 });

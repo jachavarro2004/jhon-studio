@@ -8,7 +8,7 @@ other; rendered to MP4 by
 
 It works on its own, in any project folder. It is also an opt-in integration of
 [Jhon](https://github.com/jachavarro2004/jhon-agent): with the integration on, Jhon runs it
-through `/jhon:video` (coming in a later version); with it off, Jhon shows and loads nothing
+through `/jhon:video` ([With Jhon](#with-jhon)); with it off, Jhon shows and loads nothing
 about video.
 
 Status: the first version is in progress. The whole flow works on any project (a web app, a
@@ -23,10 +23,36 @@ screens are captured with the chrome-headless-shell HyperFrames keeps (`jhon-stu
 what is missing and how to add it).
 
 ```sh
-git clone https://github.com/jachavarro2004/jhon-studio
-ln -s "$PWD/jhon-studio/bin/jhon-studio" ~/.local/bin/jhon-studio   # any folder on PATH
+git clone https://github.com/jachavarro2004/jhon-studio ~/.local/share/jhon-studio && ln -s ~/.local/share/jhon-studio/bin/jhon-studio ~/.local/bin/jhon-studio
 jhon-studio doctor
 ```
+
+Any folder on PATH does instead of `~/.local/bin`: the link is followed to the clone, where the
+studio finds its templates, fonts and agent plugin. `jhon-studio --version` prints the version;
+`git -C ~/.local/share/jhon-studio pull` updates it.
+
+## With Jhon
+
+The studio is an opt-in integration of Jhon, off by default: with it off, Jhon shows and loads
+nothing about video. Turn it on with `jhon setup` (choose jhon-studio) or the setting
+`integrations.studio = true`. Then:
+
+- in pi, `/jhon:video` makes a video of the project you are in;
+- in Claude Code, the studio's own plugin (`plugin/claude-code`, loaded by Jhon with a second
+  `--plugin-dir`) adds `/jhon-studio:video`: Claude Code names a plugin's skills
+  `<plugin>:<skill>`.
+
+Both run the same skill ([plugin/claude-code/skills/video/SKILL.md](plugin/claude-code/skills/video/SKILL.md)):
+`jhon-studio doctor`, `init` (and what to change in it), `video brief`, the script drafted from
+it and checked, `video make` to a preview, your approval (the agent never approves for you),
+then the MP4s. Jhon's `jhon doctor` checks the studio through `jhon-studio doctor --json`, and
+finds the plugin and the skill with `jhon-studio integration --json`:
+
+```json
+{ "version": "0.1.0", "plugin_dir": "/…/jhon-studio/plugin/claude-code", "skill": "/…/jhon-studio/plugin/claude-code/skills/video/SKILL.md" }
+```
+
+Without Jhon, the plugin works on its own: `claude --plugin-dir ~/.local/share/jhon-studio/plugin/claude-code`.
 
 ## The flow
 
@@ -60,7 +86,9 @@ preview` in the video folder) before the approval. Each step also runs alone:
 
 The approval is the script's hash (`"approved": { "sha256": ... }`, the SHA-256 of the script
 without that field): any change after it, a word or a mark, needs a new approval, and render
-says so: "the script changed after its approval: run jhon-studio video script --approve".
+says so: "the script changed after its approval: run jhon-studio video script --approve". An
+older script's `"approved": true` is read as not approved: "this script's approval predates its
+hash: run jhon-studio video script --approve".
 
 `--project <dir>` points at another folder; `--video <id>` names the video when the project
 has more than one (`video brief` names it after its source: `tour`, the change, `release-<tag>`,
@@ -79,7 +107,8 @@ What a video folder holds:
   narration/           <key>.opus and <key>.json per spoken line (cached; a line is spoken once)
   index.html           GENERATED: the HyperFrames composition
   captions.<lang>.json GENERATED: the subtitles, one file per subtitle language
-  assets/              GENERATED links: the studio's fonts, the screens, the narration; the logo
+  assets/              GENERATED: a copy of the studio's fonts and their licence (fonts/, so the
+                       folder carries its own); links to the screens and the narration; the logo
   vendor/              GENERATED link to three.js (only for `intro: seal`)
   renders/             the MP4s: <video>.mp4 in the narration's language, <video>.<lang>.mp4 subtitled
 ```
@@ -88,7 +117,8 @@ What a video folder holds:
 
 The studio has no model of its own: the brief is extracted, and the script is written by you or
 by an agent (Claude Code, pi; Jhon exposes it as `/jhon:video` when its studio integration is
-on). An agent's loop:
+on, and the skill it runs is [plugin/claude-code/skills/video/SKILL.md](plugin/claude-code/skills/video/SKILL.md)).
+An agent's loop:
 
 1. `jhon-studio video brief readme` (or the change, the release, a file the user names), then
    read `brief.md` and correct what the extraction got wrong with the user.
@@ -249,14 +279,19 @@ node --experimental-strip-types --no-warnings --test test/*.test.ts
 The tests need no model, GPU or network: compose runs on the sample project with fixture
 narration (`test/fixtures/sample-narration`, each line's seconds), doctor on a fake PATH, web
 capture against a page the test serves with `node:http` (skipped, with the reason, when no
-chrome-headless-shell is found). A hygiene test keeps the repository generic. CI runs them on
+chrome-headless-shell is found). Every test runs with a scratch HOME and XDG folders and
+without the `JHON_STUDIO_*` and `JHON_MEDIA_*` variables of your environment, so a run passes
+here only if it passes on a machine with no Kokoro (the web capture tests alone are handed the
+machine's Chrome, when it has one). A hygiene test keeps the repository generic and free of
+the owner's private projects. CI runs them on
 Node 22, 24 and the current LTS. The sample's screens are
 drawn by `node test/fixtures/sample-screens.mjs` (ffmpeg).
 
 | Path | What |
 | --- | --- |
 | `bin/jhon-studio` | the entry |
-| `src/` | the CLI, settings, brief, script and its reference, capture (ANSI to SVG, Chrome over CDP), narrate, compose, render, make, doctor, the YAML subset |
+| `plugin/claude-code/` | the Claude Code plugin (`jhon-studio`) and its video skill, `/jhon-studio:video`; pi runs the same `SKILL.md` |
+| `src/` | the CLI and its version, settings, brief, script and its reference, capture (ANSI to SVG, Chrome over CDP), narrate, compose, render, make, doctor, the YAML subset |
 | `engine/motion.js` | the motion engine: deterministic timelines HyperFrames seeks frame by frame |
 | `templates/presentation/` | the style, the timeline and the 3D seal's stage |
 | `voice/kokoro.py` | speaks lines with Kokoro (run by narrate in the Kokoro venv) |

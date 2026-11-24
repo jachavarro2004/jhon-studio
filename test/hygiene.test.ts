@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { CORE_REPO, CORE_SEAL, ROOT, ROSE_HEX, ROSE_RGB } from "./helpers.ts";
+import { CORE_REPO, CORE_SEAL, ROOT, ROSE_HEX, ROSE_RGB, privateWords } from "./helpers.ts";
 
 const ALLOWED = new Set(["LICENSE", "CHANGELOG.md", "README.md"]);
 const BINARY = /\.(woff2?|ttf|otf|png|jpe?g|gif|webp|mp4|opus|wav|onnx|bin)$/i;
@@ -36,6 +36,17 @@ test("no file outside LICENSE, CHANGELOG and README carries the core's repositor
     let text: string;
     try { text = readFileSync(join(ROOT, f), "utf8").toLowerCase(); } catch { continue; }
     for (const s of [CORE_REPO, CORE_SEAL, ...ROSE_HEX, ...ROSE_RGB]) if (text.includes(s)) found.push(`${f}: ${JSON.stringify(s)}`);
+  }
+  assert.deepEqual(found, []);
+});
+
+test("no file, README and CHANGELOG included, names one of the owner's private projects", () => {
+  const found: string[] = [];
+  for (const f of files()) {
+    if (BINARY.test(f)) continue;
+    let text: string;
+    try { text = readFileSync(join(ROOT, f), "utf8"); } catch { continue; }
+    if (privateWords(text).length) found.push(f);
   }
   assert.deepEqual(found, []);
 });

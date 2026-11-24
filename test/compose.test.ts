@@ -6,7 +6,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { key } from "../src/narrate.ts";
 import { lines } from "../src/script.ts";
@@ -121,4 +121,29 @@ test("compose refuses an invalid script, listing its problems", (t) => {
   assert.equal(r.code, 1);
   assert.match(r.stderr, /script\.json is not valid:\n  .*kind "slide"/);
   assert.ok(!existsSync(join(video, "index.html")));
+});
+
+test("compose copies the studio's fonts (and their licence) into the video folder, replacing a link an older compose made", (t) => {
+  const { project, video } = sampleCopy(t);
+  const fonts = join(video, "assets", "fonts");
+  mkdirSync(join(video, "assets"), { recursive: true });
+  symlinkSync(join(ROOT, "fonts"), fonts);
+  const r = cli(["video", "compose", "--project", project, "--video", SAMPLE_VIDEO]);
+  assert.equal(r.code, 0, r.stderr);
+  const st = lstatSync(fonts);
+  assert.ok(st.isDirectory() && !st.isSymbolicLink(), "a folder of its own, not a link to the studio");
+  assert.deepEqual(readdirSync(fonts).sort(), readdirSync(join(ROOT, "fonts")).sort());
+  for (const f of readdirSync(fonts)) assert.ok(readFileSync(join(fonts, f)).equals(readFileSync(join(ROOT, "fonts", f))), f);
+  assert.ok(readdirSync(fonts).includes("OFL.txt"), "the licence travels with the fonts");
+
+  // A copy left alone is not rewritten (what depends on it stays up to date).
+  const before = statSync(join(fonts, "fraunces.woff")).mtimeMs;
+  assert.equal(cli(["video", "compose", "--project", project, "--video", SAMPLE_VIDEO]).code, 0);
+  assert.equal(statSync(join(fonts, "fraunces.woff")).mtimeMs, before);
+
+  // The video folder holds what the page loads: moved elsewhere, its fonts still resolve.
+  const html = readFileSync(join(video, "index.html"), "utf8");
+  const used = [...html.matchAll(/assets\/fonts\/([\w.-]+\.woff2?)/g)].map((m) => m[1]!);
+  assert.ok(used.length >= 3, "the page loads its fonts from assets/fonts");
+  for (const f of used) assert.ok(existsSync(join(fonts, f)), f);
 });

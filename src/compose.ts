@@ -10,14 +10,15 @@
  *                       timeline.js, the one timeline on it and the grain; stage.js, the 3D seal,
  *                       only with `intro: seal`)
  *   captions.es.json    the Spanish subtitles, one per line, as composition variables
- *   assets/             links to the studio's fonts, the project's screens and the narration;
- *                       the project's logo as assets/mark.<ext>; vendor/ (three.js) for the seal
+ *   assets/             a copy of the studio's fonts and their licence (assets/fonts/, so the
+ *                       folder carries its own), links to the project's screens and the
+ *                       narration; the project's logo as assets/mark.<ext>; vendor/ (three.js) for the seal
  * Every time is computed here from the lines' real lengths: a shot lasts its lead-in, its line
  * and a tail (a proof is held at least PROOF_MIN seconds and its line plus PROOF_TAIL); a mark
  * or a body line lands where its phrase falls in the line (by its share of the line's
  * characters, which is close for Kokoro's even pace).
  */
-import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, symlinkSync, unlinkSync } from "node:fs";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { STUDIO, derivePalette, screensDir, type Config } from "./config.ts";
 import { key, narrationDir } from "./narrate.ts";
@@ -334,10 +335,10 @@ ${stageJs}
 </html>
 `;
 
-  // ---- Write: the links the page loads through, the logo, the page and its subtitles.
+  // ---- Write: the fonts, the links the page loads through, the logo, the page and its subtitles.
   const assets = join(video.dir, "assets");
   mkdirSync(assets, { recursive: true });
-  link(join(STUDIO, "fonts"), join(assets, "fonts"));
+  copyFonts(join(assets, "fonts"));
   link("../narration", join(assets, "narration"));
   if (existsSync(screens)) link(screens, join(assets, "screens"), video.project);
   if (seal) link(join(STUDIO, "vendor"), join(video.dir, "vendor"));
@@ -350,6 +351,20 @@ ${stageJs}
     files.push(f);
   }
   return { total: TOTAL, shots: timed.length, list: shotList, files };
+}
+
+/**
+ * The studio's fonts and their licence copied into `dir`, each file written only when it changes;
+ * a link there (what composes before this one made) is replaced by the folder.
+ */
+function copyFonts(dir: string) {
+  const from = join(STUDIO, "fonts");
+  let st;
+  try { st = lstatSync(dir); } catch { st = null; }
+  if (st?.isSymbolicLink()) unlinkSync(dir);
+  else if (st && !st.isDirectory()) throw new StudioError(`${dir} exists and is not a folder; move it away so compose can copy the fonts there`);
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(from)) writeIfChanged(join(dir, f), readFileSync(join(from, f)));
 }
 
 /**

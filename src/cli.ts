@@ -4,10 +4,10 @@
  * Exit codes: 0 done, 1 refused or failed (the reason on stderr), 2 a usage error (or web
  * screens with no Chrome), 3 `video make` stopped before a step that needs the user.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { compose } from "./compose.ts";
-import { ConfigError, LANGUAGES, configFile, guessConfig, loadConfig, type Config } from "./config.ts";
+import { ConfigError, LANGUAGES, STUDIO, configFile, guessConfig, loadConfig, type Config } from "./config.ts";
 import { doctor, formatReport } from "./doctor.ts";
 import { narrate } from "./narrate.ts";
 import { commandLine, renderJobs, runJobs } from "./render.ts";
@@ -17,6 +17,7 @@ import { capture } from "./capture.ts";
 import { make } from "./make.ts";
 import { briefFile, reference } from "./reference.ts";
 import { StudioError, projectDir, resolveVideo, studioDir, videoIds } from "./video.ts";
+import { VERSION } from "./version.ts";
 import { stringifyYaml } from "./yaml.ts";
 
 const VIDEO_FLAGS = `  --project <dir>   the project (default: the current folder)
@@ -37,9 +38,20 @@ Commands:
   video render       render the approved video to MP4, per language
   video make         run the remaining steps, stopping where the user is needed
   doctor             check node, ffmpeg, Kokoro, HyperFrames and Chrome
+  integration        where Jhon finds the studio's agent plugin and video skill
 
 The flow: init, video brief readme, write script.json (video script shows how), video script
---approve, video make. Run \`jhon-studio <command> --help\` for a command's options.
+--approve, video make. Run \`jhon-studio <command> --help\` for a command's options;
+\`jhon-studio --version\` prints the version.
+`,
+  integration: `Usage: jhon-studio integration [--json]
+
+For Jhon's studio integration (and any agent runtime): the studio's version, its Claude Code
+plugin folder (plugin/claude-code, which holds the video skill, /jhon-studio:video) and the
+skill's SKILL.md, as absolute paths in the studio's real folder (a link to bin/jhon-studio on
+PATH is followed).
+
+  --json   one JSON object: { "version", "plugin_dir", "skill" }
 `,
   init: `Usage: jhon-studio init [--project <dir>]
 
@@ -199,6 +211,7 @@ class UsageError extends StudioError {
 const ALLOWED: Record<string, string[]> = {
   init: ["project"],
   doctor: ["json"],
+  integration: ["json"],
   "video script": ["project", "video", "check", "approve"],
   "video narrate": ["project", "video"],
   "video compose": ["project", "video"],
@@ -239,6 +252,7 @@ export async function main(argv: string[], out = process.stdout, err = process.s
     return 2;
   }
   if (help) { out.write(HELP[cmd]!); return 0; }
+  if (cmd === "" && flags.version === true && Object.keys(flags).length === 1) { out.write(`${VERSION}\n`); return 0; }
   if (cmd === "" || cmd === "video") { err.write(HELP[cmd]!); return 2; }
   const unknown = Object.keys(flags).filter((f) => !ALLOWED[cmd]!.includes(f));
   if (unknown.length) { err.write(`jhon-studio: ${cmd}: unknown option --${unknown[0]}\n\n${HELP[cmd]}`); return 2; }
@@ -258,6 +272,14 @@ export async function main(argv: string[], out = process.stdout, err = process.s
           + "# screens: a folder of PNG or SVG screens, or a list of what video capture makes (- file:, - cli:, - web:).\n"
           + stringifyYaml(c as unknown as Record<string, never>));
         out.write(`wrote ${file}\n`);
+        return 0;
+      }
+      case "integration": {
+        // STUDIO is this file's real folder's parent: Node follows a link to bin/jhon-studio.
+        const plugin = realpathSync(join(STUDIO, "plugin", "claude-code"));
+        const info = { version: VERSION, plugin_dir: plugin, skill: join(plugin, "skills", "video", "SKILL.md") };
+        if (!existsSync(info.skill)) throw new StudioError(`${info.skill} is missing: the studio's folder is incomplete`);
+        out.write(flags.json ? JSON.stringify(info, null, 2) + "\n" : Object.entries(info).map(([k, v]) => `${k} ${v}`).join("\n") + "\n");
         return 0;
       }
       case "doctor": {

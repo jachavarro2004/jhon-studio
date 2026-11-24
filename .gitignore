@@ -7,3 +7,4 @@ node_modules/
 # The HyperFrames CLI's state and renders.
 .hyperframes/
 renders/
+.private-names

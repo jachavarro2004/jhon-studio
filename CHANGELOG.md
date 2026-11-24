@@ -44,6 +44,13 @@ All notable changes to jhon-studio are recorded here. The format follows
 - Tests on a fictional sample project with fixture narration (no models), web capture against
   a local page (skipped without a Chrome), a hygiene test, and CI on Node 22, 24 and the current
   LTS.
+- The Jhon integration, studio side: a Claude Code plugin (`plugin/claude-code`, named
+  `jhon-studio`) whose `video` skill is `/jhon-studio:video` in Claude Code; Jhon's
+  `/jhon:video` in pi runs the same `SKILL.md`. The skill walks doctor, init, brief, the script,
+  a preview and the user's approval (never the agent's) to the MP4s.
+- `jhon-studio integration [--json]`: the version, the plugin folder and the skill, as absolute
+  paths in the studio's real folder (a link on PATH is followed), for Jhon's setup and doctor.
+- `jhon-studio --version`. The version is 0.1.0.
 
 ### Changed
 
@@ -52,6 +59,14 @@ All notable changes to jhon-studio are recorded here. The format follows
   of an exponential differently (Node 22 failed the hash on `expo.out`). The reference keeps its
   hashes and now stores its values.
 - compose links a screens folder inside the project relatively, so a project can move.
+- compose copies the studio's fonts and their licence into the video's `assets/fonts/` instead
+  of linking to the studio's folder, so a video folder carries its own (a link an older compose
+  made is replaced).
+- A legacy `"approved": true` is a valid script that is not approved: render and make say
+  "this script's approval predates its hash: run jhon-studio video script --approve".
+- The tests run with a scratch HOME and XDG folders and without the environment's
+  `JHON_STUDIO_*`/`JHON_MEDIA_*`, and the sample's narration cache is seeded whole, so `video
+  make`'s tests no longer need Kokoro (CI, which has none, failed two of them).
 
 - Environment names: `JHON_STUDIO_KOKORO` and `JHON_STUDIO_CHROME`, the cache in
   `~/.cache/jhon-studio`; the core's `JHON_MEDIA_KOKORO`, `JHON_MEDIA_CHROME` and
