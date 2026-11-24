@@ -30,8 +30,12 @@ export function needApproval(video: Video, script: Script): void {
 /** A render's file: the narration's language plain, a subtitle language with its code. */
 export const renderFile = (video: Video, lang: string, narration = "en") => join(video.dir, "renders", lang === narration ? `${video.id}.mp4` : `${video.id}.${lang}.mp4`);
 
-/** The render commands for the languages asked, after checking the script is approved and composed. */
-export function renderJobs(video: Video, script: Script, langs: string[], narration = "en"): RenderJob[] {
+/**
+ * The render commands for the languages asked, after checking the script is approved and composed.
+ * `noSandbox` (the project's capture.chrome_no_sandbox) tells HyperFrames to start its Chrome
+ * without the sandbox (HYPERFRAMES_CHROME_SANDBOX=0) instead of trying it first.
+ */
+export function renderJobs(video: Video, script: Script, langs: string[], narration = "en", opts: { noSandbox?: boolean } = {}): RenderJob[] {
   needApproval(video, script);
   const html = join(video.dir, "index.html");
   if (!existsSync(html)) throw new StudioError(`${html} does not exist: run \`jhon-studio video compose\` first`);
@@ -42,7 +46,7 @@ export function renderJobs(video: Video, script: Script, langs: string[], narrat
     return {
       lang, out,
       args: ["--yes", HYPERFRAMES, "render", "--quality", "looks", "--crf", "32", "--no-browser-gpu", ...vars, "-o", out],
-      env: { HYPERFRAMES_PLUGIN_CWD: video.dir, HYPERFRAMES_NO_TELEMETRY: "1", HYPERFRAMES_NO_UPDATE_CHECK: "1", HYPERFRAMES_SKIP_SKILLS: "1" },
+      env: { HYPERFRAMES_PLUGIN_CWD: video.dir, HYPERFRAMES_NO_TELEMETRY: "1", HYPERFRAMES_NO_UPDATE_CHECK: "1", HYPERFRAMES_SKIP_SKILLS: "1", ...(opts.noSandbox ? { HYPERFRAMES_CHROME_SANDBOX: "0" } : {}) },
       cwd: homedir(),
     };
   });

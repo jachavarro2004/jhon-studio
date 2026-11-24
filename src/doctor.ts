@@ -5,13 +5,22 @@
  *   ffmpeg       on PATH (narration to Opus)
  *   kokoro       the venv's Python and the model files under the Kokoro folder
  *   hyperframes  npx on PATH and the pinned CLI in npx's cache (doctor never downloads it)
- *   chrome       chrome-headless-shell for the renders
- * Nothing is run or downloaded: each check looks for files, so it is quick and works offline.
+ *   chrome       chrome-headless-shell (captures, the text-fit check, review), started for real:
+ *                headless, on about:blank, for at most CHROME_TIMEOUT seconds, without its sandbox
+ *                when the project opts out (capture.chrome_no_sandbox), so a Chrome that dies inside
+ *                a sandbox ("No usable sandbox!") fails here with the setting as its fix
+ * Nothing is downloaded, and Chrome is the only program run: the other checks look for files, so
+ * doctor is quick and works offline.
  */
-import { accessSync, constants, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { homedir } from "node:os";
+import { spawnSync } from "node:child_process";
+import { accessSync, constants, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
+import { NO_SANDBOX_ARGS, NO_SANDBOX_FIX, chromeDeath } from "./cdp.ts";
 import { HYPERFRAMES, chromePath, kokoroDir } from "./config.ts";
+
+/** Seconds doctor gives Chrome to start and print about:blank. */
+const CHROME_TIMEOUT = 20;
 
 export interface Check { id: string; ok: boolean; detail: string; fix: string }
 export interface Report { ok: boolean; checks: Check[] }
@@ -41,7 +50,28 @@ function cachedHyperframes(env: NodeJS.ProcessEnv, home: string): string {
   return "";
 }
 
-export function doctor(env: NodeJS.ProcessEnv = process.env, nodeVersion = process.versions.node): Report {
+/** Starts Chrome headless on about:blank and waits for its page; "" when it worked, else why not. */
+function startChrome(chrome: string, noSandbox: boolean, timeout: number): string {
+  const profile = mkdtempSync(join(tmpdir(), "jhon-studio-doctor-"));
+  try {
+    const r = spawnSync(chrome, ["--headless", ...(noSandbox ? NO_SANDBOX_ARGS : []), `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check", "--disable-gpu", "--dump-dom", "about:blank"],
+      { cwd: profile, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: timeout * 1000, killSignal: "SIGKILL" });
+    if (r.error && (r.error as NodeJS.ErrnoException).code === "ETIMEDOUT") return `${chrome} did not answer within ${timeout} s`;
+    if (r.error) return `${chrome} did not start: ${r.error.message}`;
+    const why = chromeDeath(r.stderr ?? "");
+    if (why.startsWith("Chrome could not start its sandbox")) return `${chrome} did not start: ${why}`;
+    if (r.status !== 0) return `${chrome} did not start (${r.status === null ? r.signal : `exit ${r.status}`})${why ? `: ${why}` : ""}`;
+    return "";
+  } finally {
+    rmSync(profile, { recursive: true, force: true });
+  }
+}
+
+/**
+ * The checks. `noSandbox`: start Chrome without its sandbox (src/config.ts chromeNoSandbox, from
+ * the project's settings and the environment); `chromeTimeout`: the seconds Chrome is given.
+ */
+export function doctor(env: NodeJS.ProcessEnv = process.env, nodeVersion = process.versions.node, opts: { noSandbox?: boolean; chromeTimeout?: number } = {}): Report {
   const home = env.HOME || homedir();
   const checks: Check[] = [];
   const add = (id: string, ok: boolean, detail: string, fix: string) => checks.push({ id, ok, detail, fix: ok ? "" : fix });
@@ -64,9 +94,12 @@ export function doctor(env: NodeJS.ProcessEnv = process.env, nodeVersion = proce
     !npx ? `install Node with npm (it brings npx), then: npx --yes ${HYPERFRAMES} --version` : `npx --yes ${HYPERFRAMES} --version`);
 
   const chrome = chromePath(env, home);
-  const chromeOk = !!chrome && existsSync(chrome);
-  add("chrome", chromeOk, chromeOk ? chrome : chrome ? `${chrome} does not exist` : "no chrome-headless-shell (JHON_STUDIO_CHROME, or the one the HyperFrames CLI keeps)",
-    `npx --yes ${HYPERFRAMES} browser ensure`);
+  const noSandbox = opts.noSandbox ?? false;
+  const failed = !chrome ? "no chrome-headless-shell (JHON_STUDIO_CHROME, or the one the HyperFrames CLI keeps)"
+    : !existsSync(chrome) ? `${chrome} does not exist`
+    : startChrome(chrome, noSandbox, opts.chromeTimeout ?? CHROME_TIMEOUT);
+  add("chrome", !failed, failed || `${chrome}${noSandbox ? " (started without its sandbox: capture.chrome_no_sandbox)" : ""}`,
+    failed.includes("Chrome could not start its sandbox") ? NO_SANDBOX_FIX : `npx --yes ${HYPERFRAMES} browser ensure`);
 
   return { ok: checks.every((c) => c.ok), checks };
 }

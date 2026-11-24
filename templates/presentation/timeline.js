@@ -147,3 +147,56 @@
         draw(0);
         window.addEventListener("hf-seek", (e) => draw(e.detail.time));
       })();
+
+      // Text fit: an element compose marks data-fit-min (src/compose.ts fitAttrs) shrinks from its
+      // size, in steps of 3%, down to that many px, until its text takes at most data-fit-rows rows
+      // and stays inside its own box and its frame (the closest data-frame, a card, less its
+      // padding; else the picture less its margins, above the subtitles); the elements of one
+      // data-fit-group share one scale. Below the smallest size the text wraps (a kicker or a
+      // figure, on one line, overflows: compose's check reports it). It runs once the fonts are
+      // loaded, as a buildReady promise, so HyperFrames seeks no frame before the text is fitted.
+      (function () {
+        const SAFE = { left: 48, top: 32, right: 1872, bottom: 930 };
+        const root = document.getElementById("root");
+        function rows(el, size) {
+          const r = document.createRange();
+          r.selectNodeContents(el);
+          const tops = [...r.getClientRects()].filter((x) => x.width > 0 && x.height > 0).map((x) => x.top).sort((a, b) => a - b);
+          let n = tops.length ? 1 : 0;
+          for (let i = 1; i < tops.length; i++) if (tops[i] - tops[i - 1] > size * 0.5) n++;
+          return { n, box: r.getBoundingClientRect() };
+        }
+        function frameOf(el) {
+          const f = el.parentElement && el.parentElement.closest("[data-frame]");
+          if (!f) return SAFE;
+          const b = f.getBoundingClientRect(), cs = getComputedStyle(f);
+          return { left: b.left + parseFloat(cs.paddingLeft), top: b.top, right: b.right - parseFloat(cs.paddingRight), bottom: b.bottom };
+        }
+        function fits(el) {
+          const size = parseFloat(getComputedStyle(el).fontSize);
+          const { n, box } = rows(el, size), f = frameOf(el);
+          return n <= Number(el.dataset.fitRows || 1) && el.scrollWidth <= el.clientWidth + 1
+            && box.left >= f.left - 1 && box.right <= f.right + 1 && box.bottom <= f.bottom + 1;
+        }
+        function fit() {
+          root.classList.add("fitting");
+          const groups = new Map();
+          for (const el of root.querySelectorAll("[data-fit-min]")) {
+            const g = el.dataset.fitGroup || el.id;
+            if (!groups.has(g)) groups.set(g, []);
+            groups.get(g).push(el);
+          }
+          for (const els of groups.values()) {
+            if (els.every(fits)) continue;
+            const max = els.map((el) => parseFloat(getComputedStyle(el).fontSize)), min = els.map((el) => Number(el.dataset.fitMin));
+            for (let k = 0.97; ; k *= 0.97) {
+              els.forEach((el, i) => { el.style.fontSize = `${Math.max(min[i], Math.round(max[i] * k * 2) / 2)}px`; });
+              if (els.every(fits) || els.every((el, i) => max[i] * k <= min[i])) break;
+            }
+          }
+          root.classList.remove("fitting");
+        }
+        window.__hf = window.__hf || {};
+        window.__hf.buildReady = window.__hf.buildReady || {};
+        window.__hf.buildReady["fit"] = Promise.all([...document.fonts].map((f) => f.load().catch(() => null))).then(() => document.fonts.ready).then(fit);
+      })();

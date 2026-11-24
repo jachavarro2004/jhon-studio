@@ -13,7 +13,8 @@
  * under the band; `capEn` also shows the spoken line as a caption. By kind:
  *   intro    the project's mark and name; `tags` (one or two lines; default: the tagline), `kicker`
  *   head     a headline: `lead` (optional), `lines`: one or two [text, phrase said when it lands]
- *   card     a claim: `kicker`, `title` (lines), `body`: [text, phrase], `size` (title px)
+ *   card     a claim: `kicker`, `title` (lines), `body`: [text, phrase], `size` (the title's largest px:
+ *            it shrinks to fit)
  *   list     `kicker` (or `chapter`), `rows`: [left, right, phrase]
  *   numbers  `kicker`, `figures`: [figure, label, phrase]
  *   proof    a screen held close: `src` (in the project's screens folder), `crop` [x, y, w, h]

@@ -15,6 +15,26 @@ const TIMEOUT = 30;
 
 export class PageError extends Error {}
 
+/** What Chrome takes to start without its own sandbox (as HyperFrames and Puppeteer do). */
+export const NO_SANDBOX_ARGS = ["--no-sandbox", "--disable-setuid-sandbox", "--no-zygote"];
+/** How Chrome says its sandbox cannot start (no user namespaces: inside another sandbox, or as root). */
+const SANDBOX_FAILURE = /No usable sandbox|Running as root without --no-sandbox|Failed to move to new namespace/;
+/** The fix for that failure: the setting (or its environment override) that opts out of Chrome's sandbox. */
+export const NO_SANDBOX_FIX = "set capture.chrome_no_sandbox: true in the project's .jhon/studio.yaml (or JHON_STUDIO_CHROME_NO_SANDBOX=1) to start Chrome without its own sandbox, inside a sandbox that allows it none (such as Jhon's)";
+
+/**
+ * Chrome's last words before it died, as a reason: its sandbox failure named with the fix, else
+ * the last line it wrote (or "" when it wrote none).
+ */
+export function chromeDeath(stderr: string): string {
+  const m = stderr.match(SANDBOX_FAILURE);
+  if (m) return `Chrome could not start its sandbox ("${m[0] === "No usable sandbox" ? "No usable sandbox!" : m[0]}"): ${NO_SANDBOX_FIX}`;
+  return stderr.trim().split("\n").filter((l) => !/^\[[\d/.]+:(WARNING|INFO|VERBOSE)/.test(l)).at(-1) ?? "";
+}
+
+/** How the studio starts Chrome: `noSandbox` (src/config.ts chromeNoSandbox), and the folder it runs in. */
+export interface LaunchOptions { noSandbox?: boolean; cwd?: string }
+
 const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 function within<T>(p: Promise<T>, s: number, what: string): Promise<T> {
   let timer: NodeJS.Timeout;
@@ -31,18 +51,21 @@ export class Browser {
   private waiters: { method: string; session?: string; ok: (v: any) => void }[] = [];
 
   /** Starts Chrome and connects to it. */
-  static async launch(chrome: string): Promise<Browser> {
+  static async launch(chrome: string, opts: LaunchOptions = {}): Promise<Browser> {
     const b = new Browser();
     b.profile = mkdtempSync(join(tmpdir(), "jhon-studio-chrome-"));
     b.proc = spawn(chrome, [
-      "--headless", "--remote-debugging-port=0", `--user-data-dir=${b.profile}`, "--no-first-run", "--no-default-browser-check",
+      "--headless", ...(opts.noSandbox ? NO_SANDBOX_ARGS : []), "--remote-debugging-port=0", `--user-data-dir=${b.profile}`, "--no-first-run", "--no-default-browser-check",
       "--disable-gpu", "--hide-scrollbars", "--mute-audio", "--disable-extensions", "--disable-background-networking",
       "--disable-component-update", "--disable-sync", "--force-color-profile=srgb", "about:blank",
-    ], { stdio: ["ignore", "ignore", "pipe"] });
+    ], { stdio: ["ignore", "ignore", "pipe"], ...(opts.cwd ? { cwd: opts.cwd } : {}) });
     const url = await within(new Promise<string>((ok, no) => {
       let err = "";
       b.proc.on("error", (e) => no(new PageError(`${chrome} did not start: ${e.message}`)));
-      b.proc.on("exit", (code) => no(new PageError(`${chrome} exited (${code}) before it listened:\n${err.trim().split("\n").slice(-5).join("\n")}`)));
+      b.proc.on("exit", (code, signal) => {
+        const why = chromeDeath(err);
+        no(new PageError(why.startsWith("Chrome could not start its sandbox") ? why : `${chrome} exited (${code ?? signal}) before it listened:\n${err.trim().split("\n").slice(-5).join("\n")}`));
+      });
       b.proc.stderr!.on("data", (d: Buffer) => {
         err += d.toString();
         const m = err.match(/DevTools listening on (ws:\/\/\S+)/);

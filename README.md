@@ -36,7 +36,7 @@ you or an agent) and approved, its screens captured, the narration spoken, the M
 Needs Node 22 or newer (it runs the TypeScript sources with Node's type stripping: no build step,
 no dependencies), ffmpeg, and for narration and renders Kokoro and the HyperFrames CLI; web
 screens are captured with the chrome-headless-shell HyperFrames keeps (`jhon-studio doctor` says
-what is missing and how to add it).
+what is missing and how to add it; it starts that Chrome for real).
 
 ```sh
 git clone https://github.com/jachavarro2004/jhon-studio ~/.local/share/jhon-studio && ln -s ~/.local/share/jhon-studio/bin/jhon-studio ~/.local/bin/jhon-studio
@@ -60,8 +60,8 @@ nothing about video. Turn it on with `jhon setup` (choose jhon-studio) or the se
 
 Both run the same skill ([plugin/claude-code/skills/video/SKILL.md](plugin/claude-code/skills/video/SKILL.md)):
 `jhon-studio doctor`, `init` (and what to change in it), `video brief`, the script drafted from
-it and checked, `video make` to a preview, your approval (the agent never approves for you),
-then the MP4s. Jhon's `jhon doctor` checks the studio through `jhon-studio doctor --json`, and
+it and checked, `video make` to a preview, `video review` (the contact sheet, shown to you with
+the script), your approval (the agent never approves for you), then the MP4s. Jhon's `jhon doctor` checks the studio through `jhon-studio doctor --json`, and
 finds the plugin and the skill with `jhon-studio integration --json`:
 
 ```json
@@ -82,14 +82,16 @@ jhon-studio video script               # the shot model, an example of each kind
 $EDITOR .jhon/studio/tour/script.json  # write the script (or have an agent write it)
 jhon-studio video script --check       # kinds, fields, marks in order, subtitles
 jhon-studio video make                 # capture, narrate, compose; stops for the approval (exit 3)
-jhon-studio video script --approve     # you read the script and approve it
+jhon-studio video review               # review.png: each shot's final state, and the shot times
+jhon-studio video script --approve     # you read the script, look at the sheet, and approve it
 jhon-studio video make                 # renders/tour.mp4 and renders/tour.es.mp4
 ```
 
 `video make` runs what is left, in order (capture, narrate, compose, render), and stops where
 you are needed, with exit 3 and what to do: no `script.json` yet, or a script not approved as
 it is now. It composes before it stops, so the video can be previewed (`npx hyperframes
-preview` in the video folder) before the approval. Each step also runs alone:
+preview` in the video folder) and reviewed (`video review`) before the approval. Each step also
+runs alone:
 
 | Step | What it does |
 | --- | --- |
@@ -97,7 +99,8 @@ preview` in the video folder) before the approval. Each step also runs alone:
 | `video script` | prints the shot model, a valid example of each kind in the narration's language, the screens and the brief; `--check` validates; `--approve` stores the script's hash |
 | `video capture` | makes the screens `studio.yaml` lists into `screens/` (files, commands, web pages) |
 | `video narrate` | speaks each new line with Kokoro into `narration/` (a line is spoken once) |
-| `video compose` | writes `index.html` and `captions.<lang>.json` |
+| `video compose` | writes `index.html` and `captions.<lang>.json`, then measures every shot in a headless Chrome and fails on text that overflows its frame, naming the shot and the element |
+| `video review` | captures each shot's final state into `review.png` (a contact sheet) and `review/<shot>.png`, and prints each shot's start and end |
 | `video render` | renders the MP4s with HyperFrames; refuses a script not approved as it is now |
 
 The approval is the script's hash (`"approved": { "sha256": ... }`, the SHA-256 of the script
@@ -110,8 +113,48 @@ hash: run jhon-studio video script --approve".
 has more than one (`video brief` names it after its source: `tour`, the change, `release-<tag>`,
 the file's name); `video render --lang en` renders one language; `--dry-run` (render, make)
 prints the HyperFrames commands instead. Every command has `--help`. Exit codes: 0 done, 1
-refused or failed, 2 a usage error (or web screens with no Chrome), 3 `video make` stopped where
-you are needed.
+refused or failed, 2 a usage error (or web screens, or `video review`, with no Chrome), 3 `video
+make` stopped where you are needed.
+
+### Text that fits its frame
+
+Text wraps (balanced) inside its box instead of running off the picture on one line, and each
+element shrinks first, down to a smallest size, before it wraps: a headline's lines (116 px down
+to 72, at one size), a card's title (its `size`, 108 px by default, down to 64; one row per
+title line before it wraps) and its body lines (48 down to 34), a list's rows (78 down to 48; a
+row may take two), the figures (200 down to 96), the close's pitch (down to 56), the intro's
+name (down to 72) and tagline (54 down to 36), and the kickers, which keep to one line (down to
+18). The fitting runs in the page once its fonts are loaded, before HyperFrames seeks a frame.
+Text that cannot fit even so fails `video compose` (and `video make`) with exit 1, every shot at
+its final state measured in a headless Chrome:
+
+```
+jhon-studio: the text does not fit its frame in 1 shot (index.html is written, to preview it):
+  problem: the headline's line 1 (#problem-l1) runs 212 px past the frame's bottom
+shorten that text (or split it across shots), then compose again
+```
+
+The frame is the card for a card's text, and for every text the picture less 48 px at the sides
+and 32 at the top, above the subtitles (y 930). Without a Chrome, compose writes the composition
+and says `text fit: not measured: no Chrome (...)`.
+
+### Review before the approval
+
+`jhon-studio video review` captures each shot at its final state (0.35 s before its end, before
+the cut or band that leaves it) from the composition, in a headless Chrome that runs in the video
+folder and is served that folder alone (never the project's or the caller's folder): one PNG per
+shot in `review/` and `review.png`, a contact sheet of all of them, each under its shot's id,
+kind, start and end. It prints the times:
+
+```
+shot     kind     start     end   frame at
+intro    intro     0.00    8.00      7.65
+problem  head      8.00   14.95     14.60
+...
+```
+
+Look at the sheet before the script is approved (an agent shows it to the owner with the script).
+It needs the composition as the script is now (`video compose` or `video make` first).
 
 What a video folder holds:
 
@@ -122,6 +165,7 @@ What a video folder holds:
   screens/             GENERATED by capture, when studio.yaml lists screens
   narration/           <key>.opus and <key>.json per spoken line (cached; a line is spoken once)
   index.html           GENERATED: the HyperFrames composition
+  review.png, review/  GENERATED by video review: the contact sheet and each shot's frame
   captions.<lang>.json GENERATED: the subtitles, one file per subtitle language
   assets/              GENERATED: a copy of the studio's fonts and their licence (fonts/, so the
                        folder carries its own); links to the screens and the narration; the logo
@@ -141,9 +185,13 @@ An agent's loop:
 2. `jhon-studio video script`: everything needed to write `script.json` (the kinds, the rules,
    an example, the screens with their sizes, the brief). Write it; `--check` until it is valid.
    Use only what the brief or the project shows: no invented figures.
-3. `jhon-studio video make`: exit 3 means the owner must read and approve the script; show it,
-   and let the owner run `jhon-studio video script --approve` (an agent never approves for them).
-4. `jhon-studio video make` again: the MP4s, in `renders/`.
+3. `jhon-studio video make`: exit 3 means the owner must read and approve the script. Exit 1
+   with "the text does not fit its frame" names what to shorten.
+4. `jhon-studio video review`: look at `review.png` first (text crowded, a mark in the wrong
+   place, an empty shot), fix the script and run make and review again; then show the owner the
+   script and the sheet, and let the owner run `jhon-studio video script --approve` (an agent
+   never approves for them).
+5. `jhon-studio video make` again: the MP4s, in `renders/`.
 
 ## .jhon/studio.yaml
 
@@ -163,6 +211,7 @@ outside the subset is refused with its line number. Quote colours: `"#1a2b3c"`.
 | `subtitles` | the other language | the languages the lines are subtitled in (a render each); `[]` for none |
 | `voice` | `af_heart` for `en`, `ef_dora` for `es` | the Kokoro voice of the narration (any in `voices-v1.0.bin`) |
 | `screens` | the first of `docs/screens`, `docs/assets`, `screens`, `assets` that exists | the folder a proof's `src` is in, or a list of what `video capture` makes (below) |
+| `capture` | `chrome_no_sandbox: false` | `chrome_no_sandbox: true` starts every Chrome the studio starts, and the render's, without Chrome's own sandbox ([Chrome inside a sandbox](#chrome-inside-a-sandbox)) |
 
 `languages: [en, es]`, the older spelling, still reads as the narration's language (`en` unless
 `narration` says otherwise) and the others as subtitles.
@@ -214,6 +263,27 @@ the chrome-headless-shell the HyperFrames CLI keeps (`npx --yes hyperframes@0.9.
 ensure`) or `$JHON_STUDIO_CHROME`; without one, web screens are refused with that fix and
 capture exits 2, after making every other screen. The app must be running for an http address.
 
+### Chrome inside a sandbox
+
+Chrome's own sandbox needs user namespaces. Inside a sandbox that allows none (Jhon's, a
+container), Chrome dies with "No usable sandbox!", and the studio says so with the fix:
+
+```
+jhon-studio: screens[0] (home.png): Chrome could not start its sandbox ("No usable sandbox!"): set capture.chrome_no_sandbox: true in the project's .jhon/studio.yaml (or JHON_STUDIO_CHROME_NO_SANDBOX=1) to start Chrome without its own sandbox, inside a sandbox that allows it none (such as Jhon's)
+```
+
+Opt in only there, where the outer sandbox is what confines Chrome:
+
+```yaml
+capture:
+  chrome_no_sandbox: true   # false by default
+```
+
+Every Chrome the studio starts (capture, the text-fit check, review, doctor) then runs with
+`--no-sandbox --disable-setuid-sandbox --no-zygote`, and the render tells HyperFrames the same
+(`HYPERFRAMES_CHROME_SANDBOX=0`). `JHON_STUDIO_CHROME_NO_SANDBOX=1` (or `0`) overrides the
+setting either way.
+
 ## script.json
 
 ```json
@@ -242,7 +312,7 @@ an example of each kind.
 | --- | --- |
 | `intro` | `tags` (one or two lines; default: the tagline), `kicker`, `wordmark` (the name with `*emphasis*`) |
 | `head` | `chapter`, `lead`, `lines`: one or two `[text, phrase]` |
-| `card` | `kicker`, `title` (lines), `body`: `[text, phrase]`, `size` (the title's px) |
+| `card` | `kicker`, `title` (lines), `body`: `[text, phrase]`, `size` (the title's largest px; it shrinks to fit) |
 | `list` | `kicker` (or `chapter`), `rows`: `[left, right, phrase]` |
 | `numbers` | `kicker`, `figures`: `[figure, label, phrase]` |
 | `proof` | `src`, `crop` `[x, y, w, h]` (default: the whole screen), `marks`: `{ at, r, delay }`, `pan`: `{ by, at }` |
@@ -261,8 +331,11 @@ full eight-shot script, a command (`bin/larder.mjs`) and a page (`web/index.html
 
 `jhon-studio doctor` checks node (22 or newer), ffmpeg on PATH, Kokoro (its venv's Python and
 `kokoro-v1.0.onnx` and `voices-v1.0.bin`), the HyperFrames CLI (`hyperframes@0.9.58` in npx's
-cache) and chrome-headless-shell, and prints the fix under each failure. It runs and downloads
-nothing. `--json` prints `{ "ok": bool, "checks": [{ "id", "ok", "detail", "fix" }] }` for
+cache) and chrome-headless-shell, and prints the fix under each failure. It downloads nothing;
+the only program it runs is Chrome, started for real (headless, on `about:blank`, for up to
+20 s), so a Chrome that cannot start inside a sandbox fails here with
+`capture.chrome_no_sandbox` as its fix. Doctor honours that setting in the `.jhon/studio.yaml`
+of the folder it runs in, and `JHON_STUDIO_CHROME_NO_SANDBOX`. `--json` prints `{ "ok": bool, "checks": [{ "id", "ok", "detail", "fix" }] }` for
 Jhon's own doctor; it exits 1 when a check fails.
 
 Where the tools are looked for:
@@ -278,7 +351,8 @@ Where the tools are looked for:
   ```
 
 - Chrome: `$JHON_STUDIO_CHROME`, else the chrome-headless-shell the HyperFrames CLI keeps
-  (`npx --yes hyperframes@0.9.58 browser ensure`).
+  (`npx --yes hyperframes@0.9.58 browser ensure`); `$JHON_STUDIO_CHROME_NO_SANDBOX` (`1` or `0`)
+  over the project's `capture.chrome_no_sandbox`.
 - The older names `JHON_MEDIA_KOKORO`, `JHON_MEDIA_CHROME` and `~/.cache/jhon-media/kokoro` still
   work as fallbacks.
 
@@ -294,8 +368,9 @@ node --experimental-strip-types --no-warnings --test test/*.test.ts
 
 The tests need no model, GPU or network: compose runs on the sample project with fixture
 narration (`test/fixtures/sample-narration`, each line's seconds), doctor on a fake PATH, web
-capture against a page the test serves with `node:http` (skipped, with the reason, when no
-chrome-headless-shell is found). Every test runs with a scratch HOME and XDG folders and
+capture against a page the test serves with `node:http`, the text-fit check and `video review`
+(skipped, with the reason, when no chrome-headless-shell is found; the sandbox test also needs
+`bwrap`). Every test runs with a scratch HOME and XDG folders and
 without the `JHON_STUDIO_*` and `JHON_MEDIA_*` variables of your environment, so a run passes
 here only if it passes on a machine with no Kokoro (the web capture tests alone are handed the
 machine's Chrome, when it has one). A hygiene test keeps the repository generic and free of
@@ -307,7 +382,7 @@ drawn by `node test/fixtures/sample-screens.mjs` (ffmpeg).
 | --- | --- |
 | `bin/jhon-studio` | the entry |
 | `plugin/claude-code/` | the Claude Code plugin (`jhon-studio`) and its video skill, `/jhon-studio:video`; pi runs the same `SKILL.md` |
-| `src/` | the CLI and its version, settings, brief, script and its reference, capture (ANSI to SVG, Chrome over CDP), narrate, compose, render, make, doctor, the YAML subset |
+| `src/` | the CLI and its version, settings, brief, script and its reference, capture (ANSI to SVG, Chrome over CDP), narrate, compose, the text-fit check and review, render, make, doctor, the YAML subset |
 | `engine/motion.js` | the motion engine: deterministic timelines HyperFrames seeks frame by frame |
 | `templates/presentation/` | the style, the timeline and the 3D seal's stage |
 | `voice/kokoro.py` | speaks lines with Kokoro (run by narrate in the Kokoro venv) |

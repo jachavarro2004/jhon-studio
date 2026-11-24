@@ -56,7 +56,7 @@ function example(n: "en" | "es"): Script {
 
 const KINDS_TABLE = `  intro    the mark and name; tags (one or two lines; default: the tagline), kicker, wordmark
   head     a headline: chapter, lead, lines: one or two [text, phrase]
-  card     a claim: kicker, title (lines), body: [text, phrase], size (the title's px)
+  card     a claim: kicker, title (lines), body: [text, phrase], size (the title's largest px)
   list     kicker (or chapter), rows: [left, right, phrase]
   numbers  kicker, figures: [figure, label, phrase]
   proof    a screen held close: src, crop [x, y, w, h], marks: { at, r: [x, y, w, h], delay }, pan: { by, at }
@@ -82,6 +82,8 @@ Rules:
 - Text may carry *emphasis* and \`code\`. "say" spells words as they are heard (whole words).
 - Spanish is neutral, in the tú form; a subtitle holds at most 168 characters.
 - Only what the brief or the project shows: no invented figures.
+- Text wraps and shrinks to fit its frame, within limits; keep headlines, titles, rows and
+  kickers short: compose fails on text that still overflows, naming the shot and the element.
 
 Kinds:
 ${KINDS_TABLE}
@@ -94,8 +96,9 @@ ${JSON.stringify(example(n), null, 2)}
 Screens (a proof's src):
 ${screens.length ? screens.map((s) => `- ${s}`).join("\n") : "- none yet (see the brief's Screens)"}
 
-When it is written: jhon-studio video script --check; the owner reads it and approves it
-(jhon-studio video script --approve); then jhon-studio video make.
+When it is written: jhon-studio video script --check; jhon-studio video make (a preview);
+jhon-studio video review (review.png, each shot's final state, to look at and show); the owner
+reads it and approves it (jhon-studio video script --approve); then jhon-studio video make.
 
 ${brief ? `The brief (${briefFile}):\n\n${brief}` : "No brief yet: jhon-studio video brief readme (or ldd:<change>, release:<tag>, a file).\n"}`;
 }

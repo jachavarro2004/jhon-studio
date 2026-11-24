@@ -38,7 +38,7 @@ test("compose writes index.html and captions.es.json with the project's name, pa
   for (const hex of ["#7fd1b9", "#1f4a40", "#eef4f1", "#141a19"]) assert.ok(html.includes(hex), `the project's palette: ${hex}`);
   assert.ok(html.includes('src="assets/mark.svg"'), "the project's logo as its mark");
   assert.equal(readFileSync(join(video, "assets", "mark.svg"), "utf8"), readFileSync(join(project, "assets", "logo.svg"), "utf8"));
-  assert.match(html, /<div class="close-url kick" id="close-url"><div class="close-install">brew install larder<\/div>example\.com\/larder<\/div>/, "the project's url on the close, under its install line");
+  assert.match(html, /<div class="close-url kick" id="close-url"[^>]*><div class="close-install">brew install larder<\/div>example\.com\/larder<\/div>/, "the project's url on the close, under its install line");
 
   for (const word of [/jhon/i, /\bLDD\b/]) assert.doesNotMatch(html, word);
   for (const s of [CORE_REPO, CORE_SEAL, ...ROSE_HEX, ...ROSE_RGB]) {

@@ -2,12 +2,12 @@
  * src/cli.ts — the jhon-studio command line (bin/jhon-studio runs main()).
  *
  * Exit codes: 0 done, 1 refused or failed (the reason on stderr), 2 a usage error (or web
- * screens with no Chrome), 3 `video make` stopped before a step that needs the user.
+ * screens, or video review, with no Chrome), 3 `video make` stopped before a step that needs the user.
  */
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { compose } from "./compose.ts";
-import { ConfigError, LANGUAGES, STUDIO, configFile, guessConfig, loadConfig, type Config } from "./config.ts";
+import { ConfigError, LANGUAGES, STUDIO, chromeNoSandbox, configFile, guessConfig, loadConfig, type Config } from "./config.ts";
 import { doctor, formatReport } from "./doctor.ts";
 import { narrate } from "./narrate.ts";
 import { commandLine, renderJobs, runJobs } from "./render.ts";
@@ -16,6 +16,7 @@ import { screenLines, writeBrief } from "./brief.ts";
 import { capture } from "./capture.ts";
 import { make } from "./make.ts";
 import { briefFile, reference } from "./reference.ts";
+import { REVIEW_BEFORE_END, checkFit, fitLine, review, timesTable } from "./review.ts";
 import { StudioError, projectDir, resolveVideo, studioDir, videoIds } from "./video.ts";
 import { VERSION } from "./version.ts";
 import { stringifyYaml } from "./yaml.ts";
@@ -34,15 +35,16 @@ Commands:
   video script       print the shot model and the brief; check or approve script.json
   video capture      make the screens studio.yaml lists (files, commands, web pages)
   video narrate      speak the script's lines with Kokoro (cached)
-  video compose      write the HyperFrames composition and its subtitles
+  video compose      write the HyperFrames composition and its subtitles; check the text fits
+  video review       each shot's final state on a contact sheet (review.png), and its times
   video render       render the approved video to MP4, per language
   video make         run the remaining steps, stopping where the user is needed
-  doctor             check node, ffmpeg, Kokoro, HyperFrames and Chrome
+  doctor             check node, ffmpeg, Kokoro, HyperFrames and Chrome (started for real)
   integration        where Jhon finds the studio's agent plugin and video skill
 
-The flow: init, video brief readme, write script.json (video script shows how), video script
---approve, video make. Run \`jhon-studio <command> --help\` for a command's options;
-\`jhon-studio --version\` prints the version.
+The flow: init, video brief readme, write script.json (video script shows how), video make (a
+preview), video review, video script --approve, video make. Run \`jhon-studio <command> --help\`
+for a command's options; \`jhon-studio --version\` prints the version.
 `,
   integration: `Usage: jhon-studio integration [--json]
 
@@ -65,7 +67,11 @@ existing file.
   doctor: `Usage: jhon-studio doctor [--json]
 
 Checks node (22 or newer), ffmpeg, Kokoro (its venv and model), the HyperFrames CLI (pinned,
-in npx's cache) and chrome-headless-shell; prints the fix for each failure. Exits 1 if any fails.
+in npx's cache) and chrome-headless-shell, which it starts for real (headless, on about:blank,
+for up to 20 s); prints the fix for each failure. Exits 1 if any fails. Chrome dying inside a
+sandbox ("No usable sandbox!") names its fix: capture.chrome_no_sandbox: true in the
+.jhon/studio.yaml of the folder doctor runs in, or JHON_STUDIO_CHROME_NO_SANDBOX=1 (doctor
+honours both).
 
   --json   one JSON object: { ok, checks: [{ id, ok, detail, fix }] }
 `,
@@ -77,7 +83,9 @@ each run and checked alone:
   script     print the shot model and the brief (to write script.json); --check; --approve
   capture    make the screens studio.yaml lists into screens/
   narrate    speak each line with Kokoro into narration/ (only lines not spoken yet)
-  compose    write index.html and captions.<lang>.json from the script and the narration
+  compose    write index.html and captions.<lang>.json from the script and the narration, and
+             check in a headless Chrome that every shot's text fits its frame
+  review     each shot's final state into review.png (a contact sheet) and review/<shot>.png
   render     render renders/<id>.mp4 and renders/<id>.<lang>.mp4 with HyperFrames
   make       capture, narrate, compose and render, stopping where the user is needed
 
@@ -104,14 +112,31 @@ ${VIDEO_FLAGS}
   "video compose": `Usage: jhon-studio video compose [--project <dir>] [--video <id>]
 
 Writes the video's index.html (the HyperFrames composition) and captions.<lang>.json (one per
-subtitle language) from its script, its narration's seconds and the project's settings.
+subtitle language) from its script, its narration's seconds and the project's settings. Text
+wraps and shrinks to fit its frame (down to a smallest size per element); then compose measures
+every shot at its final state in a headless Chrome and fails (exit 1, index.html still written,
+to preview it) on text that overflows its card or the picture, naming the shot and the element.
+Without a Chrome it says the text was not measured.
+${VIDEO_FLAGS}
+`,
+  "video review": `Usage: jhon-studio video review [--project <dir>] [--video <id>]
+
+Captures each shot of the composed video at its final state (0.35 s before its end, before the
+cut or band that leaves it) in a headless Chrome, into the video folder: review/<shot>.png
+(1920x1080) and review.png, a contact sheet of all of them, each under its shot's id, kind,
+start and end; prints the table of each shot's start and end. Look at the sheet (and show it to
+the owner) before the script is approved. Chrome runs in the video folder and is served that
+folder alone. Needs the composition as the script is now (video compose or make first) and a
+Chrome (exit 2 without one).
 ${VIDEO_FLAGS}
 `,
   "video render": `Usage: jhon-studio video render [--project <dir>] [--video <id>] [--lang en,es] [--dry-run]
 
 Renders the composed video with the HyperFrames CLI, once per language, into the video's
 renders/: <id>.mp4 in the narration's language, <id>.<lang>.mp4 subtitled in each other one.
-Refuses unless the script is approved as it is now (jhon-studio video script --approve).
+Refuses unless the script is approved as it is now (jhon-studio video script --approve). With
+capture.chrome_no_sandbox (or JHON_STUDIO_CHROME_NO_SANDBOX=1), HyperFrames starts its Chrome
+without the sandbox (HYPERFRAMES_CHROME_SANDBOX=0).
 
   --lang <list>   the languages to render (default: the narration's and the subtitles')
   --dry-run       print the commands instead of running them
@@ -119,9 +144,9 @@ ${VIDEO_FLAGS}
 `,
   "video make": `Usage: jhon-studio video make [--project <dir>] [--video <id>] [--dry-run]
 
-Runs the video's remaining steps in order: capture, narrate, compose, render. Each skips what is
-done (screens and the composition are rewritten only when they change, lines are spoken once,
-a render newer than what it is made of is kept). Stops with exit 3 where the user is needed:
+Runs the video's remaining steps in order: capture, narrate, compose (and its text-fit check),
+render. Each skips what is done (screens and the composition are rewritten only when they
+change, lines are spoken once, a render newer than what it is made of is kept). Stops with exit 3 where the user is needed:
 no script.json yet (write it from the brief), or a script not approved as it is now (it is
 composed first, so it can be previewed; the owner approves it with video script --approve).
 
@@ -161,6 +186,11 @@ a proof's src names them:
         - click: "#login"            wait: <ms or selector>, goto: <url>, scroll: <px or selector>
 Web pages need chrome-headless-shell (npx --yes hyperframes@0.9.58 browser ensure) or
 JHON_STUDIO_CHROME; without one they are refused (exit 2) after every other screen is made.
+Inside a sandbox that allows Chrome's own none ("No usable sandbox!"), set
+  capture:
+    chrome_no_sandbox: true
+in .jhon/studio.yaml (or JHON_STUDIO_CHROME_NO_SANDBOX=1; 0 turns it off) to start every Chrome
+the studio starts, and the render's, without it.
 With screens a folder, there is nothing to capture.
 ${VIDEO_FLAGS}
 `,
@@ -217,6 +247,7 @@ const ALLOWED: Record<string, string[]> = {
   "video compose": ["project", "video"],
   "video render": ["project", "video", "lang", "dry-run"],
   "video make": ["project", "video", "dry-run"],
+  "video review": ["project", "video"],
   "video brief": ["project", "video"],
   "video capture": ["project", "video"],
 };
@@ -263,13 +294,14 @@ export async function main(argv: string[], out = process.stdout, err = process.s
         const project = projectDir(flags.project as string | undefined);
         const file = configFile(project);
         if (existsSync(file)) throw new StudioError(`${file} already exists; edit it, or remove it to start again`);
-        const { languages: _l, captures: _c, ...c } = guessConfig(project);
+        const { languages: _l, captures: _c, chromeNoSandbox: _s, ...c } = guessConfig(project);
         mkdirSync(dirname(file), { recursive: true });
         writeFileSync(file, "# jhon-studio settings for this project; every key is optional (see jhon-studio's README).\n"
           + "# palette: #rrggbb colours, quoted. mark: glyph (one character) or path (an SVG or PNG logo).\n"
           + "# intro: flat (the default) or seal (a 3D seal; a glyph mark only).\n"
           + "# narration: en or es (spoken); subtitles: the other languages. voice: a Kokoro voice (en: af_heart, es: ef_dora).\n"
           + "# screens: a folder of PNG or SVG screens, or a list of what video capture makes (- file:, - cli:, - web:).\n"
+          + "# capture: chrome_no_sandbox: true starts Chrome without its own sandbox, only inside a sandbox that allows it none (doctor says so).\n"
           + stringifyYaml(c as unknown as Record<string, never>));
         out.write(`wrote ${file}\n`);
         return 0;
@@ -283,7 +315,12 @@ export async function main(argv: string[], out = process.stdout, err = process.s
         return 0;
       }
       case "doctor": {
-        const r = doctor(process.env);
+        // The project's opt-out of Chrome's sandbox, when doctor runs in a project that has settings.
+        let settings: Config | null = null;
+        if (existsSync(configFile(process.cwd()))) {
+          try { settings = loadConfig(process.cwd()); } catch { /* the commands that use them report a broken file */ }
+        }
+        const r = doctor(process.env, process.versions.node, { noSandbox: chromeNoSandbox(settings) });
         out.write(flags.json ? JSON.stringify(r, null, 2) + "\n" : formatReport(r));
         return r.ok ? 0 : 1;
       }
@@ -344,6 +381,13 @@ export async function main(argv: string[], out = process.stdout, err = process.s
         const { config, video, script } = load(flags);
         const r = compose(video, script, config);
         out.write(`${r.total} s, ${r.shots} shots\n${r.list}\n`);
+        out.write(`${fitLine(await checkFit(video, config))}\n`);
+        return 0;
+      }
+      case "video review": {
+        const { config, video } = load(flags);
+        const r = await review(video, config);
+        out.write(`${timesTable(r.times)}\n\nwrote ${r.sheet} (${r.times.length} shots, each ${REVIEW_BEFORE_END} s before its end; one frame each in ${join(video.dir, "review")}/)\n`);
         return 0;
       }
       case "video make": {
@@ -361,7 +405,7 @@ export async function main(argv: string[], out = process.stdout, err = process.s
           if (bad !== undefined || !langs.length) throw new StudioError(`--lang: "${bad ?? flags.lang}" is not one of ${LANGUAGES.join(", ")}`, 2);
         }
         const { config, video, script } = load(flags);
-        const jobs = renderJobs(video, script, langs ?? config.languages, config.narration);
+        const jobs = renderJobs(video, script, langs ?? config.languages, config.narration, { noSandbox: chromeNoSandbox(config) });
         if (flags["dry-run"]) { out.write(jobs.map(commandLine).join("\n") + "\n"); return 0; }
         runJobs(jobs);
         out.write(jobs.map((j) => `rendered ${j.out}`).join("\n") + "\n");

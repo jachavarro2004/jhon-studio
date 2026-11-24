@@ -19,7 +19,7 @@ import { pathToFileURL } from "node:url";
 import { parseAnsi, terminalSvg } from "./ansi.ts";
 import { Browser, PageError } from "./cdp.ts";
 import { imageSize } from "./compose.ts";
-import { HYPERFRAMES, chromePath, type Capture, type Config } from "./config.ts";
+import { HYPERFRAMES, chromeNoSandbox, chromePath, type Capture, type Config } from "./config.ts";
 import { StudioError, writeIfChanged, type Video } from "./video.ts";
 
 /** What a capture run made, and what failed (by screen); `needChrome` when web screens had no Chrome. */
@@ -100,7 +100,7 @@ export async function capture(video: Video, config: Config, env: NodeJS.ProcessE
   let browser: Browser | null = null;
   const done = new Set<number>();
   try {
-    browser = await Browser.launch(chrome);
+    browser = await Browser.launch(chrome, { noSandbox: chromeNoSandbox(config, env) });
     for (const [i, c] of web) {
       const url = address(c.url, video.project);
       try {
