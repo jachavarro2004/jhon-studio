@@ -28,7 +28,7 @@ It works on its own, in any project folder. It is also an opt-in integration of
 through `/jhon:video` ([With Jhon](#with-jhon)); with it off, Jhon shows and loads nothing
 about video.
 
-Status: version 0.1.0, the first release ([Releases](#releases)). The whole flow works on any
+Status: version 0.1.0-rc.1, the release candidate of the first release ([Releases](#releases)). The whole flow works on any
 project (a web app, a command-line tool, a library): a brief drafted from its own text, a script
 written from it (by you or an agent) and approved, its screens captured, the narration spoken,
 the MP4s rendered.
@@ -40,13 +40,13 @@ no dependencies), ffmpeg, and for narration and renders Kokoro and the HyperFram
 screens are captured with the chrome-headless-shell HyperFrames keeps (`jhon-studio doctor` says
 what is missing and how to add it; it starts that Chrome for real).
 
-Install the latest release, 0.1.0: download its tarball, check its sha256 and its signature
+Install the release candidate, 0.1.0-rc.1: download its tarball, check its sha256 and its signature
 (with [cosign](https://docs.sigstore.dev/cosign/system_config/installation/): the release
 workflow of this repository signed it at its tag), unpack it into a folder of its own version and
 link the command onto PATH:
 
 ```sh
-V=0.1.0
+V=0.1.0-rc.1
 R=https://github.com/jachavarro2004/jhon-studio/releases/download/v$V
 T=jhon-studio-$V.tar.gz
 cd "$(mktemp -d)"
@@ -88,8 +88,8 @@ the script), your approval (the agent never approves for you), then the MP4s. Jh
 finds the plugin and the skill with `jhon-studio integration --json`:
 
 ```json
-{ "schema": "jhon-studio.integration/v1", "version": "0.1.0", "requires_jhon": ">=0.5.0-rc.1", "contract": "jhon.integration/v1",
-  "plugin_dir": "/…/jhon-studio/0.1.0/plugin/claude-code", "skill": "/…/jhon-studio/0.1.0/plugin/claude-code/skills/video/SKILL.md" }
+{ "schema": "jhon-studio.integration/v1", "version": "0.1.0-rc.1", "requires_jhon": ">=0.5.0-rc.1", "contract": "jhon.integration/v1",
+  "plugin_dir": "/…/jhon-studio/0.1.0-rc.1/plugin/claude-code", "skill": "/…/jhon-studio/0.1.0-rc.1/plugin/claude-code/skills/video/SKILL.md" }
 ```
 
 `schema` is this answer's own format; `requires_jhon` the jhon versions the studio runs with (a
@@ -97,7 +97,7 @@ SemVer range); `contract` the integration contract it speaks. A jhon outside the
 studio off for its run with one note, and works as it does with the studio off
 ([Releases](#releases)).
 
-Without Jhon, the plugin works on its own: `claude --plugin-dir ~/.local/share/jhon-studio/0.1.0/plugin/claude-code` (the folder of the version you installed).
+Without Jhon, the plugin works on its own: `claude --plugin-dir ~/.local/share/jhon-studio/0.1.0-rc.1/plugin/claude-code` (the folder of the version you installed).
 
 ## The flow
 
@@ -420,7 +420,7 @@ spaces for AND, `||` for OR), and `contract`, the integration contract it speaks
 
 | jhon-studio | `requires_jhon` | `contract` |
 | --- | --- | --- |
-| 0.1.0 | `>=0.5.0-rc.1` | `jhon.integration/v1` |
+| 0.1.0-rc.1 | `>=0.5.0-rc.1` | `jhon.integration/v1` |
 
 With a jhon outside the range, or one that does not speak the contract, Jhon keeps the studio
 off for that run with one note naming both versions and the fix (update jhon, or install a
