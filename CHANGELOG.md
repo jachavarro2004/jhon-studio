@@ -7,6 +7,14 @@ notes are its section here.
 
 ## [Unreleased]
 
+### Changed
+
+- The README follows the skeleton every Jhon repository shares: banner, its own line, badges,
+  See it, What it is, Install, Use, How it works (a diagram), Docs, Support, License. See it
+  shows the sample film made by jhon-studio (an inline preview, docs/assets/sample-preview.webp,
+  linking to the film on GitHub, and the film with Spanish subtitles) and the sample's review
+  contact sheet (docs/assets/sample-review.png).
+
 ## [0.1.0]
 
 The first release. It runs with jhon `>=0.5.0-rc.1` (`requires_jhon`).
