@@ -426,6 +426,21 @@ With a jhon outside the range, or one that does not speak the contract, Jhon kee
 off for that run with one note naming both versions and the fix (update jhon, or install a
 studio release that supports it); the studio's own commands still work without Jhon.
 
+CI holds the studio to both ends of that promise with a real jhon (`.github/workflows/jhon.yml`,
+on every push and pull request, and weekly so a new jhon release is tried without one). It
+tests two jhon versions: the minimum, the `>=` bound of `requires_jhon` that
+`tools/jhon-compat.ts` reads from `src/version.ts` when it runs, and the latest, jhon's newest
+stable release in the range, or its newest pre-release while no stable release meets the
+minimum. For each, it installs that jhon in a clean HOME from its signed release (jhon's
+`install.sh` with `JHON_VERSION`, which checks the sha256 and the cosign signature), turns
+`integrations.studio` on, puts this commit's studio on PATH as its release tarball unpacks
+(`tools/pack.sh`), and checks that `jhon-studio integration --json` gives every field jhon reads
+with `src/version.ts`'s values, that `jhon doctor` exits 0 with its `jhon-studio` section showing
+the requires line met and each of the studio's own checks as `jhon-studio doctor --json` gives
+it, and that a copy of the studio whose `requires_jhon` no jhon release meets is off with jhon's
+one note while `jhon doctor` still exits 0. No model, GPU or render: on the runner, the Kokoro,
+HyperFrames and Chrome checks are warnings with their fix.
+
 ## Development
 
 A clone is the development install: it runs from the working tree, and `git pull` updates it.
@@ -459,6 +474,7 @@ drawn by `node test/fixtures/sample-screens.mjs` (ffmpeg).
 | `bin/jhon-studio` | the entry |
 | `src/version.ts` | the version, `requires_jhon`, the contract and the release's signer: their one source |
 | `tools/pack.sh`, `tools/notes.sh` | the release tarball and its sha256; a version's release notes |
+| `.github/workflows/jhon.yml`, `tools/jhon-compat.ts` | the studio against its minimum jhon and the latest, installed from their signed releases |
 | `.github/workflows/release.yml` | a tag's release: tests, tarball, signature, GitHub release |
 | `plugin/claude-code/` | the Claude Code plugin (`jhon-studio`) and its video skill, `/jhon-studio:video`; pi runs the same `SKILL.md` |
 | `src/` | the CLI and its version, settings, brief, script and its reference, capture (ANSI to SVG, Chrome over CDP), narrate, compose, the text-fit check and review, render, make, doctor, the YAML subset |
