@@ -1,0 +1,152 @@
+# jhon-studio against the jhon it says it runs with (README, "Releases"): for the minimum jhon,
+# the >= bound of src/version.ts's REQUIRES_JHON (tools/jhon-compat.ts reads it at run time), and
+# for the latest jhon (its newest stable release in that range, or its newest release of any kind
+# while no stable one is), install that jhon in a clean HOME from its signed release as jhon's
+# README says (install.sh with JHON_VERSION, which checks the sha256 and, with cosign installed,
+# the signature), turn integrations.studio on, put this checkout's studio on PATH as its release
+# tarball unpacks (tools/pack.sh), and check jhon's view of it:
+#   - `jhon-studio integration --json` has every field jhon reads, with src/version.ts's values;
+#   - `jhon doctor` exits 0, and its jhon-studio section is the requires line jhon met, then each
+#     check of `jhon-studio doctor --json` as jhon shows it (a runner has no Kokoro, HyperFrames or
+#     Chrome: those checks are warnings with their fix, as on any machine without them);
+#   - a copy of the studio that requires a jhon no release meets is off with jhon's one note, and
+#     `jhon doctor` still exits 0.
+# No model, no GPU, no render. It also runs weekly, so a new jhon release is tried without a push.
+
+name: jhon
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # jhon's repository: its releases, and its installer.
+  CORE: jachavarro2004/jhon-agent
+
+jobs:
+  versions:
+    name: pick the jhon versions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+
+      - id: pick
+        name: The minimum (src/version.ts) and the latest jhon
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/$CORE/releases?per_page=100" --jq '.[] | select(.draft | not) | .tag_name' > "$RUNNER_TEMP/tags"
+          matrix=$(tools/jhon-compat.ts versions < "$RUNNER_TEMP/tags")
+          echo "$matrix"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  jhon:
+    name: jhon ${{ matrix.jhon }} (${{ matrix.role }})
+    needs: versions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.versions.outputs.matrix) }}
+    env:
+      JHON: ${{ matrix.jhon }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+
+      # install.sh checks the signature only when cosign is on PATH.
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+      - name: A clean HOME
+        run: |
+          home="$RUNNER_TEMP/home"
+          mkdir -p "$home/.local/bin"
+          {
+            echo "HOME=$home"
+            echo "XDG_CONFIG_HOME=$home/.config"
+            echo "XDG_CACHE_HOME=$home/.cache"
+            echo "XDG_DATA_HOME=$home/.local/share"
+            echo "XDG_STATE_HOME=$home/.local/state"
+          } >> "$GITHUB_ENV"
+          echo "$home/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install jhon ${{ matrix.jhon }} from its signed release
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -fsSL "https://raw.githubusercontent.com/$CORE/main/install.sh" | JHON_VERSION="$JHON" sh | tee install.log
+          grep -Fx "jhon: sha256 verified" install.log
+          grep -Fx "jhon: signature verified (cosign)" install.log
+          test "$(command -v jhon)" = "$HOME/.local/bin/jhon"
+          v=$(jhon version --json | jq -r .version)
+          test "$v" = "$JHON" || { echo "::error::jhon version says $v, not $JHON"; exit 1; }
+          jhon settings set integrations.studio true
+
+      - name: This checkout's studio, as its release tarball unpacks
+        run: |
+          tarball=$(tools/pack.sh "$RUNNER_TEMP/dist")
+          v=$(bin/jhon-studio --version)
+          studio="$RUNNER_TEMP/studio/$v"
+          mkdir -p "$studio"
+          tar -xzf "$tarball" -C "$studio"
+          echo "STUDIO=$studio" >> "$GITHUB_ENV"
+
+      - name: integration --json gives what jhon reads
+        run: |
+          PATH="$STUDIO/bin:$PATH"
+          test "$(command -v jhon-studio)" = "$STUDIO/bin/jhon-studio"
+          (cd "$HOME" && jhon-studio integration --json) > "$RUNNER_TEMP/answer.json"
+          cat "$RUNNER_TEMP/answer.json"
+          tools/jhon-compat.ts integration "$RUNNER_TEMP/answer.json" "$STUDIO"
+
+      - name: jhon doctor exits 0; its jhon-studio section is the requires line met and the studio's checks
+        run: |
+          compat="$PWD/tools/jhon-compat.ts"
+          PATH="$STUDIO/bin:$PATH"
+          cd "$HOME"
+          code=0
+          jhon doctor > "$RUNNER_TEMP/doctor.txt" || code=$?
+          cat "$RUNNER_TEMP/doctor.txt"
+          test "$code" -eq 0 || { echo "::error::jhon doctor exited $code"; exit 1; }
+          jhon-studio doctor --json > "$RUNNER_TEMP/studio-doctor.json" || test $? -eq 1
+          "$compat" doctor "$JHON" "$RUNNER_TEMP/doctor.txt" "$RUNNER_TEMP/answer.json" "$RUNNER_TEMP/studio-doctor.json"
+
+      - name: A studio that requires a newer jhon is off with the note; jhon doctor still exits 0
+        run: |
+          compat="$PWD/tools/jhon-compat.ts"
+          off="$RUNNER_TEMP/studio-off/$(basename "$STUDIO")"
+          mkdir -p "$(dirname "$off")"
+          cp -a "$STUDIO" "$off"
+          sed -i 's/^export const REQUIRES_JHON = ".*";$/export const REQUIRES_JHON = ">=99.0.0";/' "$off/src/version.ts"
+          PATH="$off/bin:$PATH"
+          cd "$HOME"
+          jhon-studio integration --json > "$RUNNER_TEMP/answer-off.json"
+          "$compat" integration "$RUNNER_TEMP/answer-off.json" "$off" ">=99.0.0"
+          code=0
+          jhon doctor > "$RUNNER_TEMP/doctor-off.txt" || code=$?
+          cat "$RUNNER_TEMP/doctor-off.txt"
+          test "$code" -eq 0 || { echo "::error::jhon doctor exited $code with an incompatible studio"; exit 1; }
+          "$compat" off "$JHON" "$RUNNER_TEMP/doctor-off.txt" "$RUNNER_TEMP/answer-off.json"

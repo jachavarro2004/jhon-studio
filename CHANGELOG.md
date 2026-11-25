@@ -5,6 +5,20 @@ All notable changes to jhon-studio are recorded here. The format follows
 [Semantic Versioning](https://semver.org/) (`X.Y.Z`, pre-releases `X.Y.Z-rc.N`). Each release's
 notes are its section here.
 
+## [Unreleased]
+
+### Added
+
+- CI against a real jhon (`.github/workflows/jhon.yml`, on every push and pull request, and
+  weekly): the minimum jhon, the `>=` bound of `requires_jhon` read from `src/version.ts` at run
+  time, and the latest (its newest stable release in the range, else its newest pre-release),
+  each installed in a clean HOME from its signed release with jhon's `install.sh`. With
+  `integrations.studio` on and this commit's studio unpacked from its release tarball, it checks
+  that `integration --json` gives every field jhon reads, that `jhon doctor` exits 0 with the
+  requires line met and the studio's own checks in its `jhon-studio` section, and that a studio
+  requiring a newer jhon is off with jhon's one note while doctor still exits 0.
+  `tools/jhon-compat.ts` picks the versions and makes those checks.
+
 ## [0.1.0-rc.1]
 
 The first release. It runs with jhon `>=0.5.0-rc.1` (`requires_jhon`).
