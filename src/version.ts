@@ -9,7 +9,7 @@
  */
 
 /** The version: SemVer, X.Y.Z or X.Y.Z-rc.N (the release tag is v<VERSION>). */
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.0-rc.1";
 
 /** The schema of `jhon-studio integration --json`'s own JSON. */
 export const SCHEMA = "jhon-studio.integration/v1";

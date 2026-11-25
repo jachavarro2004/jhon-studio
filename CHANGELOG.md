@@ -5,7 +5,7 @@ All notable changes to jhon-studio are recorded here. The format follows
 [Semantic Versioning](https://semver.org/) (`X.Y.Z`, pre-releases `X.Y.Z-rc.N`). Each release's
 notes are its section here.
 
-## [0.1.0]
+## [0.1.0-rc.1]
 
 The first release. It runs with jhon `>=0.5.0-rc.1` (`requires_jhon`).
 
