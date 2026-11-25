@@ -20,7 +20,7 @@
 ## See it
 
 <p align="center">
-  <a href="https://github.com/user-attachments/assets/STUDIO-SAMPLE-EN"><img src="docs/assets/sample-preview.webp" alt="A preview of the sample film: the intro of Larder, a fictional app, its three steps and its pantry screen" width="760"></a>
+  <a href="https://github.com/user-attachments/assets/95da3d93-f2a9-424a-8305-8d8b8e2d6a27"><img src="docs/assets/sample-preview.webp" alt="A preview of the sample film: the intro of Larder, a fictional app, its three steps and its pantry screen" width="760"></a>
 </p>
 
 The sample film, made by jhon-studio from
@@ -30,7 +30,7 @@ narrated in English. Click the preview to play it.
 <details>
 <summary>With Spanish subtitles</summary>
 
-https://github.com/user-attachments/assets/STUDIO-SAMPLE-ES
+https://github.com/user-attachments/assets/adbf684f-7094-492b-b22a-fd5f4c466a20
 
 </details>
 

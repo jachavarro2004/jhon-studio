@@ -82,6 +82,6 @@ test("How it works is a diagram GitHub renders (a mermaid block or an SVG in the
 
 // EXPECTED RED until the owner uploads the two films and the placeholders are replaced:
 // it keeps the README from merging with STUDIO-SAMPLE-EN or STUDIO-SAMPLE-ES in it.
-test("PLACEHOLDER (expected RED until the films are uploaded): See it carries the real user-attachments URLs, not STUDIO-SAMPLE-EN/ES", () => {
+test("See it carries the uploaded films' user-attachments URLs, not placeholders", () => {
   assert.doesNotMatch(README, /STUDIO-SAMPLE-(EN|ES)/, "replace the placeholder film URLs with the uploaded ones");
 });
