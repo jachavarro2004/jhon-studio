@@ -17,6 +17,32 @@
   <a href="https://github.com/jachavarro2004/jhon-studio/stargazers"><img src="https://img.shields.io/github/stars/jachavarro2004/jhon-studio?style=flat&color=e7bbc8&labelColor=1f1f28" alt="Stars"></a>
 </p>
 
+## See it
+
+<p align="center">
+  <a href="https://github.com/user-attachments/assets/STUDIO-SAMPLE-EN"><img src="docs/assets/sample-preview.webp" alt="A preview of the sample film: the intro of Larder, a fictional app, its three steps and its pantry screen" width="760"></a>
+</p>
+
+The sample film, made by jhon-studio from
+[examples/sample-project](examples/sample-project) (Larder, a fictional app): 45 seconds,
+narrated in English. Click the preview to play it.
+
+<details>
+<summary>With Spanish subtitles</summary>
+
+https://github.com/user-attachments/assets/STUDIO-SAMPLE-ES
+
+</details>
+
+Before you approve a script, `jhon-studio video review` puts each shot's final frame on one
+contact sheet. The sample's:
+
+<p align="center">
+  <img src="docs/assets/sample-review.png" alt="The review contact sheet: each shot's final frame, under its id, kind, start and end" width="760">
+</p>
+
+## What it is
+
 Narrated presentation videos for any project, made by code: the project's own name, palette,
 logo and screens; a flat animated intro; real screens held close as proof (images, command
 output, web pages); narration spoken locally by Kokoro in English or Spanish, subtitled in the
@@ -70,36 +96,7 @@ and the link moves to it; linking the older folder again rolls back. (An install
 releases, a clone in `~/.local/share/jhon-studio`: move it away first.) To work on the studio
 itself, use a clone instead ([Development](#development)).
 
-## With Jhon
-
-The studio is an opt-in integration of Jhon, off by default: with it off, Jhon shows and loads
-nothing about video. Turn it on with `jhon setup` (choose jhon-studio) or the setting
-`integrations.studio = true`. Then:
-
-- in pi, `/jhon:video` makes a video of the project you are in;
-- in Claude Code, the studio's own plugin (`plugin/claude-code`, loaded by Jhon with a second
-  `--plugin-dir`) adds `/jhon-studio:video`: Claude Code names a plugin's skills
-  `<plugin>:<skill>`.
-
-Both run the same skill ([plugin/claude-code/skills/video/SKILL.md](plugin/claude-code/skills/video/SKILL.md)):
-`jhon-studio doctor`, `init` (and what to change in it), `video brief`, the script drafted from
-it and checked, `video make` to a preview, `video review` (the contact sheet, shown to you with
-the script), your approval (the agent never approves for you), then the MP4s. Jhon's `jhon doctor` checks the studio through `jhon-studio doctor --json`, and
-finds the plugin and the skill with `jhon-studio integration --json`:
-
-```json
-{ "schema": "jhon-studio.integration/v1", "version": "0.1.0", "requires_jhon": ">=0.5.0-rc.1", "contract": "jhon.integration/v1",
-  "plugin_dir": "/…/jhon-studio/0.1.0/plugin/claude-code", "skill": "/…/jhon-studio/0.1.0/plugin/claude-code/skills/video/SKILL.md" }
-```
-
-`schema` is this answer's own format; `requires_jhon` the jhon versions the studio runs with (a
-SemVer range); `contract` the integration contract it speaks. A jhon outside the range turns the
-studio off for its run with one note, and works as it does with the studio off
-([Releases](#releases)).
-
-Without Jhon, the plugin works on its own: `claude --plugin-dir ~/.local/share/jhon-studio/0.1.0/plugin/claude-code` (the folder of the version you installed).
-
-## The flow
+## Use
 
 A video lives in its project, in `.jhon/studio/<video>/`.
 
@@ -145,6 +142,89 @@ prints the HyperFrames commands instead. Every command has `--help`. Exit codes:
 refused or failed, 2 a usage error (or web screens, or `video review`, with no Chrome), 3 `video
 make` stopped where you are needed.
 
+### With Jhon
+
+The studio is an opt-in integration of Jhon, off by default: with it off, Jhon shows and loads
+nothing about video. Turn it on with `jhon setup` (choose jhon-studio) or the setting
+`integrations.studio = true`. Then:
+
+- in pi, `/jhon:video` makes a video of the project you are in;
+- in Claude Code, the studio's own plugin (`plugin/claude-code`, loaded by Jhon with a second
+  `--plugin-dir`) adds `/jhon-studio:video`: Claude Code names a plugin's skills
+  `<plugin>:<skill>`.
+
+Both run the same skill ([plugin/claude-code/skills/video/SKILL.md](plugin/claude-code/skills/video/SKILL.md)):
+`jhon-studio doctor`, `init` (and what to change in it), `video brief`, the script drafted from
+it and checked, `video make` to a preview, `video review` (the contact sheet, shown to you with
+the script), your approval (the agent never approves for you), then the MP4s. Jhon's `jhon doctor` checks the studio through `jhon-studio doctor --json`, and
+finds the plugin and the skill with `jhon-studio integration --json`:
+
+```json
+{ "schema": "jhon-studio.integration/v1", "version": "0.1.0", "requires_jhon": ">=0.5.0-rc.1", "contract": "jhon.integration/v1",
+  "plugin_dir": "/…/jhon-studio/0.1.0/plugin/claude-code", "skill": "/…/jhon-studio/0.1.0/plugin/claude-code/skills/video/SKILL.md" }
+```
+
+`schema` is this answer's own format; `requires_jhon` the jhon versions the studio runs with (a
+SemVer range); `contract` the integration contract it speaks. A jhon outside the range turns the
+studio off for its run with one note, and works as it does with the studio off
+([Releases](#releases)).
+
+Without Jhon, the plugin works on its own: `claude --plugin-dir ~/.local/share/jhon-studio/0.1.0/plugin/claude-code` (the folder of the version you installed).
+
+### From an agent
+
+An agent (Claude Code, pi; Jhon exposes it as `/jhon:video` when its studio integration is on)
+writes the script and runs the same commands; the skill it runs is
+[plugin/claude-code/skills/video/SKILL.md](plugin/claude-code/skills/video/SKILL.md). Its loop:
+
+1. `jhon-studio video brief readme` (or the change, the release, a file the user names), then
+   read `brief.md` and correct what the extraction got wrong with the user.
+2. `jhon-studio video script`: everything needed to write `script.json` (the kinds, the rules,
+   an example, the screens with their sizes, the brief). Write it; `--check` until it is valid.
+   Use only what the brief or the project shows: no invented figures.
+3. `jhon-studio video make`: exit 3 means the owner must read and approve the script. Exit 1
+   with "the text does not fit its frame" names what to shorten.
+4. `jhon-studio video review`: look at `review.png` first (text crowded, a mark in the wrong
+   place, an empty shot), fix the script and run make and review again; then show the owner the
+   script and the sheet, and let the owner run `jhon-studio video script --approve` (an agent
+   never approves for them).
+5. `jhon-studio video make` again: the MP4s, in `renders/`.
+
+## How it works
+
+```mermaid
+flowchart TD
+  source["README, change,<br>release or file"] -->|video brief| brief["brief.md"]
+  brief -->|you or an agent| script["script.json"]
+  script -->|video make| preview["screens, narration,<br>composition"]
+  preview -->|video review| sheet["review.png"]
+  sheet -->|you approve| approved["the script's<br>SHA-256"]
+  approved -->|video make| films["MP4s: narrated,<br>and subtitled"]
+```
+
+The studio has no model of its own: the brief is extracted from text, and the script is written
+by you or by an agent. The rest is code: `video capture` makes the screens (files, command
+output, web pages in a headless Chrome), Kokoro speaks the narration locally, `video compose`
+writes the HyperFrames composition and checks that its text fits, and HyperFrames renders it on
+the studio's motion engine. Nothing is rendered until you approve the script as it is.
+
+What a video folder holds:
+
+```
+.jhon/studio/<video>/
+  brief.md             what the script is written from (video brief drafts it; edit it)
+  script.json          the source: you write it, and approve it
+  screens/             GENERATED by capture, when studio.yaml lists screens
+  narration/           <key>.opus and <key>.json per spoken line (cached; a line is spoken once)
+  index.html           GENERATED: the HyperFrames composition
+  review.png, review/  GENERATED by video review: the contact sheet and each shot's frame
+  captions.<lang>.json GENERATED: the subtitles, one file per subtitle language
+  assets/              GENERATED: a copy of the studio's fonts and their licence (fonts/, so the
+                       folder carries its own); links to the screens and the narration; the logo
+  vendor/              GENERATED link to three.js (only for `intro: seal`)
+  renders/             the MP4s: <video>.mp4 in the narration's language, <video>.<lang>.mp4 subtitled
+```
+
 ### Text that fits its frame
 
 Text wraps (balanced) inside its box instead of running off the picture on one line, and each
@@ -185,44 +265,20 @@ problem  head      8.00   14.95     14.60
 Look at the sheet before the script is approved (an agent shows it to the owner with the script).
 It needs the composition as the script is now (`video compose` or `video make` first).
 
-What a video folder holds:
+## Docs
 
-```
-.jhon/studio/<video>/
-  brief.md             what the script is written from (video brief drafts it; edit it)
-  script.json          the source: you write it, and approve it
-  screens/             GENERATED by capture, when studio.yaml lists screens
-  narration/           <key>.opus and <key>.json per spoken line (cached; a line is spoken once)
-  index.html           GENERATED: the HyperFrames composition
-  review.png, review/  GENERATED by video review: the contact sheet and each shot's frame
-  captions.<lang>.json GENERATED: the subtitles, one file per subtitle language
-  assets/              GENERATED: a copy of the studio's fonts and their licence (fonts/, so the
-                       folder carries its own); links to the screens and the narration; the logo
-  vendor/              GENERATED link to three.js (only for `intro: seal`)
-  renders/             the MP4s: <video>.mp4 in the narration's language, <video>.<lang>.mp4 subtitled
-```
+The reference for each part:
 
-## From an agent
+- [.jhon/studio.yaml](#jhonstudioyaml): a project's settings, the screens to capture, Chrome
+  inside a sandbox.
+- [script.json](#scriptjson): the shot model and its fields.
+- [doctor](#doctor): what the studio needs and where it looks for it.
+- [Releases](#releases): versions, the signature check, compatibility with Jhon.
+- [Development](#development): a clone, the tests, the layout.
+- The agent skill: [plugin/claude-code/skills/video/SKILL.md](plugin/claude-code/skills/video/SKILL.md).
+- What changed in each release: [CHANGELOG.md](CHANGELOG.md).
 
-The studio has no model of its own: the brief is extracted, and the script is written by you or
-by an agent (Claude Code, pi; Jhon exposes it as `/jhon:video` when its studio integration is
-on, and the skill it runs is [plugin/claude-code/skills/video/SKILL.md](plugin/claude-code/skills/video/SKILL.md)).
-An agent's loop:
-
-1. `jhon-studio video brief readme` (or the change, the release, a file the user names), then
-   read `brief.md` and correct what the extraction got wrong with the user.
-2. `jhon-studio video script`: everything needed to write `script.json` (the kinds, the rules,
-   an example, the screens with their sizes, the brief). Write it; `--check` until it is valid.
-   Use only what the brief or the project shows: no invented figures.
-3. `jhon-studio video make`: exit 3 means the owner must read and approve the script. Exit 1
-   with "the text does not fit its frame" names what to shorten.
-4. `jhon-studio video review`: look at `review.png` first (text crowded, a mark in the wrong
-   place, an empty shot), fix the script and run make and review again; then show the owner the
-   script and the sheet, and let the owner run `jhon-studio video script --approve` (an agent
-   never approves for them).
-5. `jhon-studio video make` again: the MP4s, in `renders/`.
-
-## .jhon/studio.yaml
+### .jhon/studio.yaml
 
 Every key is optional; a missing one takes its default. The file is a small subset of YAML
 (mappings, lists of scalars or of mappings, quoted or plain scalars, comments), read by the studio's own parser; anything
@@ -261,7 +317,7 @@ subtitles: [es]
 screens: screens
 ```
 
-### Screens to capture
+#### Screens to capture
 
 `screens` may list the screens instead of naming a folder; `video capture` (and `video make`)
 makes them into the video's `screens/`, and a proof's `src` is the name:
@@ -292,7 +348,7 @@ the chrome-headless-shell the HyperFrames CLI keeps (`npx --yes hyperframes@0.9.
 ensure`) or `$JHON_STUDIO_CHROME`; without one, web screens are refused with that fix and
 capture exits 2, after making every other screen. The app must be running for an http address.
 
-### Chrome inside a sandbox
+#### Chrome inside a sandbox
 
 Chrome's own sandbox needs user namespaces. Inside a sandbox that allows none (Jhon's, a
 container), Chrome dies with "No usable sandbox!", and the studio says so with the fix:
@@ -313,7 +369,7 @@ Every Chrome the studio starts (capture, the text-fit check, review, doctor) the
 (`HYPERFRAMES_CHROME_SANDBOX=0`). `JHON_STUDIO_CHROME_NO_SANDBOX=1` (or `0`) overrides the
 setting either way.
 
-## script.json
+### script.json
 
 ```json
 {
@@ -356,7 +412,7 @@ words; backticks are always dropped). `timing` may set `TAIL`, `PROOF_TAIL`, `PR
 The sample project, [examples/sample-project](examples/sample-project) (a fictional app), has a
 full eight-shot script, a command (`bin/larder.mjs`) and a page (`web/index.html`) to capture.
 
-## doctor
+### doctor
 
 `jhon-studio doctor` checks node (22 or newer), ffmpeg on PATH, Kokoro (its venv's Python and
 `kokoro-v1.0.onnx` and `voices-v1.0.bin`), the HyperFrames CLI (`hyperframes@0.9.58` in npx's
